@@ -6,6 +6,7 @@ const LEFT_BASE_X = 75, RIGHT_BASE_X = CANVAS_W - 75;
 const ALLY_SPAWN_X = RIGHT_BASE_X - 40;
 const ENEMY_SPAWN_X = LEFT_BASE_X + 40;
 const PLAYER_BASE_MAX_HP = 500;
+const MAX_ENEMIES_ON_FIELD = 20; // 화면에 적이 한꺼번에 몰려 겹치지 않도록 동시 등장 상한
 const SAVE_KEY = "doggreatwar_save_v1";
 
 const STAGE_MAX = 6;
@@ -424,10 +425,14 @@ function startStage(stageDef) {
     spawnTimer: 900,
     cannonCharge: 0,
     cannonMax: 9500,
+    autoSpawn: false,
     over: false,
     lastTime: performance.now(),
   };
   ALLY_TYPES.forEach(t => { battle.cooldowns[t.id] = 0; });
+  const autoBtn = document.getElementById("btn-autospawn");
+  autoBtn.classList.remove("on");
+  autoBtn.textContent = "🔁 자동 소환 OFF";
   document.getElementById("stage-label").textContent = stageDef.isBoss ? "최종 보스전" : stageDef.label;
   renderUnitBar();
   showScreen("screen-battle");
@@ -474,6 +479,16 @@ function trySpawnAlly(typeId) {
   battle.units.push(createAlly(typeId));
   spawnImpact(ALLY_SPAWN_X, LANE_Y - 10, "#8fd3ff");
   playSfx("spawnAlly");
+}
+
+function autoSpawnTick() {
+  // 자동 소환 ON일 때, 쿨다운이 끝나고 돈이 충분한 유닛을 자동으로 계속 출격시킨다
+  for (const type of ALLY_TYPES) {
+    const stats = getAllyStats(type.id);
+    if (battle.cooldowns[type.id] <= 0 && battle.money >= stats.base.cost) {
+      trySpawnAlly(type.id);
+    }
+  }
 }
 
 /* ===================== 이펙트 ===================== */
@@ -619,14 +634,16 @@ function fireCannon(chargeRatio) {
     if (u.x > bestX) { bestX = u.x; best = u; }
   }
   const dmg = Math.round((160 + battle.stage.globalIndex * 24) * chargeRatio);
-  // 포탄이 기지에서 실제로 발사되어 사정거리(내 기지~적 기지) 끝까지 날아간다
-  battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 46, target: best, dmg, hit: false });
-  spawnBurst(RIGHT_BASE_X - 30, LANE_Y - 46, "#ffb85a");
+  // 포탄 대신 큰 파도가 기지에서 밀려나가 사정거리(내 기지~적 기지) 끝까지 휩쓸고 간다
+  battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, target: best, dmg, hit: false, trail: [] });
+  spawnBurst(RIGHT_BASE_X - 30, LANE_Y - 6, "#5ec8e8");
   playSfx("cannon");
   battle.cannonCharge = 0;
 }
 function updateProjectiles(dt) {
   for (const p of battle.projectiles) {
+    p.trail.push(p.x);
+    if (p.trail.length > 5) p.trail.shift();
     const targetX = (p.target && !p.target.dead) ? p.target.x : LEFT_BASE_X;
     const step = CANNON_FLIGHT_SPEED * (dt / 1000);
     if (p.x - targetX <= step) {
@@ -635,10 +652,10 @@ function updateProjectiles(dt) {
       if (p.target && !p.target.dead) {
         dealDamageToUnit(p.target, p.dmg);
         p.target.x = Math.max(ENEMY_SPAWN_X, p.target.x - 30); // 넉백: 적 기지 쪽으로 밀려남
-        spawnBurst(p.target.x, p.target.y - 20, "#ffb85a");
+        spawnBurst(p.target.x, p.target.y - 20, "#5ec8e8");
       } else {
         attackBase("ally", p.dmg);
-        spawnBurst(LEFT_BASE_X, LANE_Y - 46, "#ffb85a");
+        spawnBurst(LEFT_BASE_X, LANE_Y - 6, "#5ec8e8");
         spawnFloatText(LEFT_BASE_X, LANE_Y - 90, `기지 명중 -${p.dmg}`, "#e04545");
       }
     } else {
@@ -649,18 +666,21 @@ function updateProjectiles(dt) {
 }
 function drawProjectiles() {
   for (const p of battle.projectiles) {
+    const bob = Math.sin(performance.now() / 60) * 4;
+    // 지나온 자리에 남는 파도 잔상
+    p.trail.forEach((tx, i) => {
+      ctx.save();
+      ctx.globalAlpha = ((i + 1) / p.trail.length) * 0.35;
+      ctx.font = "34px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("🌊", tx, p.y + bob);
+      ctx.restore();
+    });
     ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.beginPath();
-    ctx.arc(0, 0, 10, 0, Math.PI * 2);
-    ctx.fillStyle = "#5a3a1c";
-    ctx.fill();
-    ctx.strokeStyle = "#2a1a0c";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.font = "16px sans-serif";
+    ctx.translate(p.x, p.y + bob);
+    ctx.font = "50px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("💨", 20, 4);
+    ctx.fillText("🌊", 0, 0);
     ctx.restore();
   }
 }
@@ -668,6 +688,13 @@ document.getElementById("btn-cannon").addEventListener("click", () => {
   if (!battle || battle.over) return;
   const ratio = Math.max(0.35, battle.cannonCharge / battle.cannonMax);
   fireCannon(ratio);
+});
+document.getElementById("btn-autospawn").addEventListener("click", (e) => {
+  if (!battle || battle.over) return;
+  battle.autoSpawn = !battle.autoSpawn;
+  e.currentTarget.classList.toggle("on", battle.autoSpawn);
+  e.currentTarget.textContent = battle.autoSpawn ? "🔁 자동 소환 ON" : "🔁 자동 소환 OFF";
+  playSfx("click");
 });
 
 function endStage(win) {
@@ -903,17 +930,24 @@ function gameLoop(now) {
 
     battle.spawnTimer -= dt;
     if (battle.spawnTimer <= 0) {
-      const catId = pickCatId(battle.stage);
-      battle.units.push(createEnemy(catId, battle.stage.catStatMul));
-      spawnImpact(ENEMY_SPAWN_X, LANE_Y - 10, "#ff8a8a");
-      playSfx("spawnEnemy");
-      battle.spawnTimer = battle.stage.spawnInterval;
+      const enemyCount = battle.units.reduce((n, u) => n + (u.side === "enemy" && !u.dead ? 1 : 0), 0);
+      if (enemyCount < MAX_ENEMIES_ON_FIELD) {
+        const catId = pickCatId(battle.stage);
+        battle.units.push(createEnemy(catId, battle.stage.catStatMul));
+        spawnImpact(ENEMY_SPAWN_X, LANE_Y - 10, "#ff8a8a");
+        playSfx("spawnEnemy");
+        battle.spawnTimer = battle.stage.spawnInterval;
+      } else {
+        // 화면에 적이 너무 많이 쌓이지 않도록 상한을 두고, 여유가 생기면 곧바로 다시 시도한다
+        battle.spawnTimer = 400;
+      }
     }
 
     for (const u of battle.units) updateUnit(u, dt);
     battle.units = battle.units.filter(u => !u.dead);
     updateCannon(dt);
     updateProjectiles(dt);
+    if (battle.autoSpawn) autoSpawnTick();
 
     document.getElementById("enemy-hp-fill").style.width = `${(battle.enemyBaseHp / battle.enemyBaseMaxHp) * 100}%`;
     document.getElementById("player-hp-fill").style.width = `${(battle.playerBaseHp / PLAYER_BASE_MAX_HP) * 100}%`;
