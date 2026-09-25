@@ -217,6 +217,18 @@ button {
   box-shadow: 0 2px 10px rgba(0,0,0,.15);
 }
 
+#control-ui {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 6px 0;
+  flex-wrap: wrap;
+}
+#control-hint { font-size: .8em; color: #888; }
+#control-ui button {
+  border: none; border-radius: 999px; padding: 6px 14px; font-weight: bold; cursor: pointer;
+  background: #eee; box-shadow: 0 2px 0 #ccc;
+}
+#control-ui button:active { transform: translateY(2px); box-shadow: none; }
+
 #cannon-ui {
   display: flex; align-items: center; gap: 10px;
   justify-content: center;

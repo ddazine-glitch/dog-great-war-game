@@ -451,6 +451,9 @@ class Unit {
     this.hitFlash = 0;
     this.spawnAnim = 260;
     this.attackAnim = 0;
+    this.manualOffsetX = 0;
+    this.manualJumpT = 0;
+    this.selected = false;
   }
 }
 
@@ -507,6 +510,8 @@ function startStage(stageDef) {
     lastTime: performance.now(),
   };
   ALLY_TYPES.forEach(t => { battle.cooldowns[t.id] = 0; });
+  selectedUnit = null;
+  document.getElementById("control-hint").textContent = "🐾 아군 캐릭터를 탭해서 골라보세요";
   const autoBtn = document.getElementById("btn-autospawn");
   autoBtn.classList.remove("on");
   autoBtn.textContent = "🔁 자동 소환 OFF";
@@ -680,6 +685,9 @@ function updateUnit(u, dt) {
     }
   }
   if (u.attackAnim > 0) u.attackAnim -= dt;
+  if (u.manualOffsetX !== 0) u.manualOffsetX *= 0.9; // 살짝 밀었다가 스르륵 제자리로 돌아오는 느낌
+  if (Math.abs(u.manualOffsetX) < 0.5) u.manualOffsetX = 0;
+  if (u.manualJumpT > 0) u.manualJumpT -= dt;
 }
 
 function attackBase(attackerSide, dmg) {
@@ -811,6 +819,48 @@ canvas.width = CANVAS_W * CANVAS_SCALE;
 canvas.height = CANVAS_H * CANVAS_SCALE;
 ctx.scale(CANVAS_SCALE, CANVAS_SCALE);
 
+let selectedUnit = null;
+canvas.addEventListener("click", (e) => {
+  if (!battle) return;
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) * (CANVAS_W / rect.width);
+  const cy = (e.clientY - rect.top) * (CANVAS_H / rect.height);
+  let best = null, bestDist = 46;
+  for (const u of battle.units) {
+    if (u.dead || u.side !== "ally") continue;
+    const d = Math.hypot(u.x - cx, u.y - cy);
+    if (d < bestDist) { bestDist = d; best = u; }
+  }
+  if (best) {
+    if (selectedUnit) selectedUnit.selected = false;
+    selectedUnit = best;
+    selectedUnit.selected = true;
+    document.getElementById("control-hint").textContent = `🐾 ${selectedUnit.name || ""} 선택됨 - 조종해보세요!`;
+    playSfx("click");
+  }
+});
+function nudgeSelected(dir) {
+  if (!selectedUnit || selectedUnit.dead) return;
+  selectedUnit.manualOffsetX = Math.max(-34, Math.min(34, selectedUnit.manualOffsetX + dir * 16));
+}
+function jumpSelected() {
+  if (!selectedUnit || selectedUnit.dead) return;
+  if (selectedUnit.manualJumpT <= 0) {
+    selectedUnit.manualJumpT = 420;
+    playSfx("feed");
+  }
+}
+// 화면상의 화살표 방향과 실제 이동 방향이 일치하도록 맞춘다 (◀=왼쪽/x감소, ▶=오른쪽/x증가)
+document.getElementById("btn-move-back").addEventListener("click", () => nudgeSelected(-1));
+document.getElementById("btn-move-fwd").addEventListener("click", () => nudgeSelected(1));
+document.getElementById("btn-jump").addEventListener("click", jumpSelected);
+document.addEventListener("keydown", (e) => {
+  if (!screens["screen-battle"] || !screens["screen-battle"].classList.contains("active")) return;
+  if (e.key === "ArrowLeft") nudgeSelected(-1);
+  else if (e.key === "ArrowRight") nudgeSelected(1);
+  else if (e.key === "ArrowUp" || e.key === " ") { jumpSelected(); e.preventDefault(); }
+});
+
 function drawBase(x, side, hp, maxHp) {
   ctx.save();
   ctx.translate(x, LANE_Y);
@@ -857,8 +907,11 @@ function drawUnit(u) {
   // 공격할 때 살짝 앞으로 튀어나갔다 돌아오는 타격 모션
   const lungeDir = u.side === "ally" ? -1 : 1;
   const lunge = u.attackAnim > 0 ? Math.sin((1 - u.attackAnim / 180) * Math.PI) * 11 * lungeDir : 0;
+  // 플레이어가 직접 조종할 때 쓰는 살짝 밀기 + 점프 연출 (전투 계산에는 영향 없음)
+  const manualX = u.manualOffsetX || 0;
+  const jumpHeight = u.manualJumpT > 0 ? Math.sin((1 - u.manualJumpT / 420) * Math.PI) * 26 : 0;
 
-  ctx.translate(u.x + lunge, u.y + bob);
+  ctx.translate(u.x + lunge + manualX, u.y + bob - jumpHeight);
   // 이모지 기본 방향(왼쪽)을 기준으로, 오른쪽으로 걷는 적군만 좌우 반전한다
   ctx.scale(u.side === "enemy" ? -scale : scale, scale);
 
@@ -912,6 +965,16 @@ function drawUnit(u) {
   ctx.lineWidth = 1.4;
   ctx.strokeRect(-barW / 2, 0, barW, 7);
   ctx.restore();
+
+  if (u.selected) {
+    const markerBob = Math.sin(performance.now() / 130) * 4;
+    ctx.save();
+    ctx.translate(u.x + manualX, barY - 22 + markerBob - jumpHeight);
+    ctx.font = "22px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("👆", 0, 0);
+    ctx.restore();
+  }
 }
 
 function drawEffects(dt) {
