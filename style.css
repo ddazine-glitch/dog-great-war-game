@@ -22,7 +22,7 @@ body {
 
 #app {
   width: 100%;
-  max-width: 1000px;
+  max-width: 1400px;
   padding: 12px;
 }
 
@@ -134,13 +134,13 @@ button {
   box-shadow: 0 3px 0 #ddd;
 }
 .roster-card .avatar {
-  font-size: 2.6em;
+  font-size: 3.2em;
   position: relative;
   display: inline-block;
   margin-bottom: 6px;
 }
-.roster-card .avatar.stage-2 { filter: drop-shadow(0 0 6px #6fbfff); }
-.roster-card .avatar.stage-3 { filter: drop-shadow(0 0 12px #ffd23f); }
+.roster-card .avatar.stage-2 { filter: saturate(1.5) brightness(1.05) hue-rotate(200deg) drop-shadow(0 0 8px #6fbfff); }
+.roster-card .avatar.stage-3 { filter: saturate(1.9) brightness(1.2) hue-rotate(35deg) drop-shadow(0 0 14px #ffd23f); }
 .roster-card .badge {
   position: absolute; right: -8px; bottom: -6px; font-size: 0.5em;
 }
@@ -181,7 +181,7 @@ button {
 
 #game-canvas {
   width: 100%;
-  max-width: 960px;
+  max-width: 1360px;
   height: auto;
   background: linear-gradient(#bfe8ff 0%, #bfe8ff 70%, #d9c48c 70%, #cdb06f 100%);
   border-radius: 10px;

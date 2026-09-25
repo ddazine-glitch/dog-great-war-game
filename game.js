@@ -483,20 +483,24 @@ function fireCannon(chargeRatio) {
     if (u.x > bestX) { bestX = u.x; best = u; }
   }
   const dmg = Math.round((40 + battle.stage.globalIndex * 6) * chargeRatio);
+  spawnBurst(RIGHT_BASE_X - 30, LANE_Y, "#ffb85a");
   if (best) {
+    // 대포알이 사정거리(내 기지~적 기지) 안의 첫 유닛에 명중
     dealDamageToUnit(best, dmg);
     best.x = Math.min(RIGHT_BASE_X - 20, best.x + 26);
     spawnBurst(best.x, best.y, "#ffb85a");
   } else {
-    spawnFloatText(RIGHT_BASE_X - 120, LANE_Y - 60, "명중 대상 없음", "#888");
+    // 가로막는 유닛이 없으면 포탄이 끝까지 날아가 적 기지에 직격
+    attackBase("ally", dmg);
+    spawnBurst(LEFT_BASE_X, LANE_Y, "#ffb85a");
+    spawnFloatText(LEFT_BASE_X, LANE_Y - 60, `기지 명중 -${dmg}`, "#e04545");
   }
   playSfx("cannon");
   battle.cannonCharge = 0;
 }
 document.getElementById("btn-cannon").addEventListener("click", () => {
   if (!battle || battle.over) return;
-  const ratio = battle.cannonCharge / battle.cannonMax;
-  if (ratio < 0.15) return;
+  const ratio = Math.max(0.35, battle.cannonCharge / battle.cannonMax);
   fireCannon(ratio);
 });
 
@@ -529,20 +533,30 @@ function endStage(win) {
 /* ===================== 렌더링 ===================== */
 const canvas = document.getElementById("game-canvas");
 const ctx = canvas.getContext("2d");
+const CANVAS_SCALE = 2;
+canvas.width = CANVAS_W * CANVAS_SCALE;
+canvas.height = CANVAS_H * CANVAS_SCALE;
+ctx.scale(CANVAS_SCALE, CANVAS_SCALE);
+
+const STAGE_FILTER = {
+  1: "none",
+  2: "saturate(1.5) brightness(1.05) hue-rotate(200deg)",
+  3: "saturate(1.9) brightness(1.2) hue-rotate(35deg)",
+};
 
 function drawBase(x, side, hp, maxHp) {
   ctx.save();
   ctx.translate(x, LANE_Y);
   ctx.fillStyle = side === "ally" ? "#7fb8e8" : "#e88a8a";
-  ctx.fillRect(-30, -70, 60, 70);
-  ctx.font = "36px sans-serif";
+  ctx.fillRect(-40, -92, 80, 92);
+  ctx.font = "50px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(side === "ally" ? "🐶" : "😾", 0, -35);
+  ctx.fillText(side === "ally" ? "🐶" : "😾", 0, -44);
   const pct = Math.max(0, hp / maxHp);
   ctx.fillStyle = "#ddd";
-  ctx.fillRect(-32, -84, 64, 8);
+  ctx.fillRect(-42, -108, 84, 10);
   ctx.fillStyle = side === "ally" ? "#3f8ce0" : "#e04545";
-  ctx.fillRect(-32, -84, 64 * pct, 8);
+  ctx.fillRect(-42, -108, 84 * pct, 10);
   ctx.restore();
 }
 
@@ -550,17 +564,17 @@ function drawUnit(u) {
   ctx.save();
   const bob = Math.sin(performance.now() / 180 + u.x) * 2;
   let scale = 1 + (u.spawnAnim > 0 ? (u.spawnAnim / 260) * 0.6 : 0);
-  if (u.side === "enemy" && u.tier) scale *= 1 + (u.tier - 1) * 0.12;
-  if (u.side === "ally" && u.stage) scale *= 1 + (u.stage - 1) * 0.14;
+  if (u.side === "enemy" && u.tier) scale *= 1 + (u.tier - 1) * 0.16;
+  if (u.side === "ally" && u.stage) scale *= 1 + (u.stage - 1) * 0.22;
   ctx.translate(u.x, u.y + bob);
   ctx.scale(u.side === "ally" ? -scale : scale, scale);
 
-  if (u.side === "ally" && u.stage >= 3) {
+  if (u.side === "ally" && u.stage >= 2) {
     ctx.save();
-    ctx.globalAlpha = 0.35 + 0.15 * Math.sin(performance.now() / 150);
+    ctx.globalAlpha = 0.3 + 0.18 * Math.sin(performance.now() / 150);
     ctx.beginPath();
-    ctx.arc(0, -18, 26, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffd23f";
+    ctx.arc(0, -22, u.stage >= 3 ? 34 : 28, 0, Math.PI * 2);
+    ctx.fillStyle = u.stage >= 3 ? "#ffd23f" : "#7fd0ff";
     ctx.fill();
     ctx.restore();
   }
@@ -568,26 +582,27 @@ function drawUnit(u) {
     ctx.save();
     ctx.globalAlpha = Math.min(0.6, u.hitFlash / 140);
     ctx.beginPath();
-    ctx.arc(0, -18, 22, 0, Math.PI * 2);
+    ctx.arc(0, -22, 28, 0, Math.PI * 2);
     ctx.fillStyle = "#fff";
     ctx.fill();
     ctx.restore();
   }
 
-  ctx.font = "34px sans-serif";
+  ctx.font = "46px sans-serif";
   ctx.textAlign = "center";
+  if (u.side === "ally" && u.stage) ctx.filter = STAGE_FILTER[u.stage];
   ctx.fillText(u.emoji, 0, 0);
-  if (u.badge) ctx.fillText(u.badge, 14, -20);
-  if (u.side === "ally" && u.stage === 2) ctx.fillText("🛡️", 14, -20);
+  ctx.filter = "none";
+  if (u.badge) ctx.fillText(u.badge, 18, -26);
   ctx.restore();
 
   const pct = Math.max(0, u.hp / u.maxHp);
   ctx.save();
-  ctx.translate(u.x, u.y - 38);
+  ctx.translate(u.x, u.y - 48);
   ctx.fillStyle = "#ddd";
-  ctx.fillRect(-16, 0, 32, 5);
+  ctx.fillRect(-20, 0, 40, 6);
   ctx.fillStyle = u.side === "ally" ? "#3f8ce0" : "#e04545";
-  ctx.fillRect(-16, 0, 32 * pct, 5);
+  ctx.fillRect(-20, 0, 40 * pct, 6);
   ctx.restore();
 }
 
