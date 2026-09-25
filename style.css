@@ -145,6 +145,15 @@ button {
   background: #fff; border-radius: 999px; padding: 6px 12px;
   box-shadow: 0 2px 0 #ccc;
 }
+.upgrade-box {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.upgrade-card { text-align: center; }
+.upgrade-desc { font-size: .82em; color: #777; margin-bottom: 10px; }
+
 .roster-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

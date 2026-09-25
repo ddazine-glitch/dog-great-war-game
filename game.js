@@ -15,6 +15,13 @@ const STAGE_ATK_MUL = { 1: 1, 2: 1.4, 3: 1.9, 4: 2.5, 5: 3.2, 6: 4.0 };
 // 다음 단계로 올라가는 데 필요한 "누적" 열매 급여 횟수 (단계별)
 const STAGE_UP_THRESHOLDS = { 2: 3, 3: 7, 4: 12, 5: 18, 6: 25 };
 
+// 기지/대포도 캐릭터처럼 열매로 3단계까지 강화 - 단계마다 모습도 함께 바뀐다
+const UPGRADE_MAX = 3;
+const UPGRADE_COST = { 2: 10, 3: 25 }; // 다음 단계까지 필요한 누적 열매 수
+const BASE_HP_MUL = { 1: 1, 2: 1.6, 3: 2.4 };
+const CANNON_DMG_MUL = { 1: 1, 2: 1.5, 3: 2.2 };
+const CANNON_CHARGE_MUL = { 1: 1, 2: 0.85, 3: 0.7 };
+
 const ALLY_TYPES = [
   { id: "hippo",    name: "하마",   emoji: "🦛", cost: 50,  cooldown: 2600, hp: 130, atk: 11, range: 42, atkInterval: 1200, speed: 34 },
   { id: "pig",      name: "돼지",   emoji: "🐷", cost: 35,  cooldown: 1800, hp: 70,  atk: 9,  range: 34, atkInterval: 900,  speed: 46 },
@@ -217,7 +224,33 @@ function defaultSave() {
     unlockedIndex: 1,
     fruits: { red: 3, orange: 3, yellow: 2, green: 2, purple: 1 },
     allies,
+    baseLevel: 1,
+    cannonLevel: 1,
   };
+}
+function totalFruits() {
+  return Object.values(save.fruits).reduce((a, b) => a + b, 0);
+}
+function spendFruits(n) {
+  if (totalFruits() < n) return false;
+  let remain = n;
+  for (const id of Object.keys(save.fruits)) {
+    const take = Math.min(save.fruits[id], remain);
+    save.fruits[id] -= take;
+    remain -= take;
+    if (remain <= 0) break;
+  }
+  return true;
+}
+function upgradeBaseOrCannon(kind) {
+  const levelKey = kind === "base" ? "baseLevel" : "cannonLevel";
+  if (save[levelKey] >= UPGRADE_MAX) return false;
+  const cost = UPGRADE_COST[save[levelKey] + 1];
+  if (!spendFruits(cost)) return false;
+  save[levelKey]++;
+  playSfx("evolve");
+  persistSave();
+  return true;
 }
 let save = loadSave();
 function loadSave() {
@@ -403,8 +436,39 @@ function renderFruitBar() {
     bar.appendChild(chip);
   });
 }
+function renderBaseCannonUpgrades() {
+  const box = document.getElementById("upgrade-box");
+  box.innerHTML = "";
+  const defs = [
+    { kind: "base", label: "🏠 기지 강화", desc: "기지 체력 증가 + 외형 강화", visuals: ["기본 기지", "보강된 기지", "요새화된 기지"] },
+    { kind: "cannon", label: "💥 대포 강화", desc: "대포 데미지 증가 + 발사 연출 강화", visuals: ["파도", "커다란 파도", "파동"] },
+  ];
+  defs.forEach(def => {
+    const level = save[def.kind === "base" ? "baseLevel" : "cannonLevel"];
+    const atMax = level >= UPGRADE_MAX;
+    const cost = atMax ? 0 : UPGRADE_COST[level + 1];
+    const card = document.createElement("div");
+    card.className = "roster-card upgrade-card";
+    card.innerHTML = `
+      <div class="name">${def.label}</div>
+      <div class="stage-tag">${level}/${UPGRADE_MAX}단계 - ${def.visuals[level - 1]}${atMax ? " (최대)" : ""}</div>
+      <div class="upgrade-desc">${def.desc}</div>
+    `;
+    const btn = document.createElement("button");
+    btn.className = "mid-btn";
+    btn.textContent = atMax ? "최대 강화 완료" : `🍎 열매 ${cost}개로 강화`;
+    btn.disabled = atMax || totalFruits() < cost;
+    btn.addEventListener("click", () => {
+      if (upgradeBaseOrCannon(def.kind)) renderRoster();
+    });
+    card.appendChild(btn);
+    box.appendChild(card);
+  });
+}
+
 function renderRoster() {
   renderFruitBar();
+  renderBaseCannonUpgrades();
   const list = document.getElementById("roster-list");
   list.innerHTML = "";
   ALLY_TYPES.forEach(type => {
@@ -491,6 +555,7 @@ function createEnemy(catId, mul) {
 }
 
 function startStage(stageDef) {
+  const playerBaseMaxHp = Math.round(PLAYER_BASE_MAX_HP * BASE_HP_MUL[save.baseLevel]);
   battle = {
     stage: stageDef,
     units: [],
@@ -499,11 +564,12 @@ function startStage(stageDef) {
     money: 100 + stageDef.globalIndex * 10,
     enemyBaseHp: stageDef.enemyBaseMaxHp,
     enemyBaseMaxHp: stageDef.enemyBaseMaxHp,
-    playerBaseHp: PLAYER_BASE_MAX_HP,
+    playerBaseHp: playerBaseMaxHp,
+    playerBaseMaxHp: playerBaseMaxHp,
     cooldowns: {},
     spawnTimer: 900,
     cannonCharge: 0,
-    cannonMax: 5000,
+    cannonMax: 5000 * CANNON_CHARGE_MUL[save.cannonLevel],
     autoSpawn: false,
     over: false,
     lastTime: performance.now(),
@@ -717,9 +783,9 @@ function fireCannon(chargeRatio) {
     if (u.dead || u.side !== "enemy") continue;
     if (u.x > bestX) { bestX = u.x; best = u; }
   }
-  const dmg = Math.round((420 + battle.stage.globalIndex * 60) * chargeRatio);
+  const dmg = Math.round((420 + battle.stage.globalIndex * 60) * chargeRatio * CANNON_DMG_MUL[save.cannonLevel]);
   // 포탄 대신 큰 파도가 기지에서 밀려나가 사정거리(내 기지~적 기지) 끝까지 휩쓸고 간다
-  battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, target: best, dmg, hit: false, trail: [] });
+  battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, target: best, dmg, hit: false, trail: [], level: save.cannonLevel });
   spawnBurst(RIGHT_BASE_X - 30, LANE_Y - 6, "#5ec8e8");
   playSfx("cannon");
   battle.cannonCharge = 0;
@@ -748,23 +814,39 @@ function updateProjectiles(dt) {
   }
   battle.projectiles = battle.projectiles.filter(p => !p.hit);
 }
+const CANNON_WAVE_LOOK = {
+  1: { emoji: "🌊", size: 50 },
+  2: { emoji: "🌊", size: 72 },
+  3: { emoji: "🌀", size: 78 },
+};
 function drawProjectiles() {
   for (const p of battle.projectiles) {
+    const look = CANNON_WAVE_LOOK[p.level || 1];
     const bob = Math.sin(performance.now() / 60) * 4;
-    // 지나온 자리에 남는 파도 잔상
+    // 지나온 자리에 남는 파도(또는 파동) 잔상
     p.trail.forEach((tx, i) => {
       ctx.save();
       ctx.globalAlpha = ((i + 1) / p.trail.length) * 0.35;
-      ctx.font = "34px sans-serif";
+      ctx.font = `${look.size * 0.68}px sans-serif`;
       ctx.textAlign = "center";
-      ctx.fillText("🌊", tx, p.y + bob);
+      ctx.fillText(look.emoji, tx, p.y + bob);
       ctx.restore();
     });
     ctx.save();
     ctx.translate(p.x, p.y + bob);
-    ctx.font = "50px sans-serif";
+    if (p.level >= 3) {
+      // 3단계 "파동"은 번쩍이는 에너지 링을 두른다
+      ctx.globalAlpha = 0.5 + 0.3 * Math.sin(performance.now() / 40);
+      ctx.beginPath();
+      ctx.arc(0, 0, look.size * 0.55, 0, Math.PI * 2);
+      ctx.strokeStyle = "#8fd3ff";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.font = `${look.size}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("🌊", 0, 0);
+    ctx.fillText(look.emoji, 0, 0);
     ctx.restore();
   }
 }
@@ -862,30 +944,41 @@ document.addEventListener("keydown", (e) => {
 });
 
 function drawBase(x, side, hp, maxHp) {
+  const baseLevel = side === "ally" ? save.baseLevel : 1;
+  const growth = 1 + (baseLevel - 1) * 0.16;
   ctx.save();
   ctx.translate(x, LANE_Y);
   ctx.beginPath();
-  ctx.ellipse(0, 6, 50, 14, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 6, 50 * growth, 14 * growth, 0, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0,0,0,.18)";
   ctx.fill();
   ctx.fillStyle = side === "ally" ? "#7fb8e8" : "#e88a8a";
   ctx.strokeStyle = side === "ally" ? "#2f6ca8" : "#a83f3f";
   ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.roundRect(-52, -118, 104, 122, 10);
+  ctx.roundRect(-52 * growth, -118 * growth, 104 * growth, 122 * growth, 10);
   ctx.fill();
   ctx.stroke();
-  ctx.font = "68px sans-serif";
+  ctx.font = `${68 * growth}px sans-serif`;
   ctx.textAlign = "center";
-  ctx.fillText(side === "ally" ? "🐶" : "😾", 0, -55);
+  ctx.fillText(side === "ally" ? "🐶" : "😾", 0, -55 * growth);
+  if (side === "ally" && baseLevel >= 2) {
+    ctx.font = `${30 * growth}px sans-serif`;
+    ctx.fillText("🛡️", 42 * growth, -30 * growth);
+  }
+  if (side === "ally" && baseLevel >= 3) {
+    ctx.font = `${30 * growth}px sans-serif`;
+    ctx.fillText("🚩", -42 * growth, -95 * growth);
+  }
   const pct = Math.max(0, hp / maxHp);
+  const barY = -118 * growth - 20;
   ctx.fillStyle = "#fff";
-  ctx.fillRect(-54, -138, 108, 12);
+  ctx.fillRect(-54, barY, 108, 12);
   ctx.fillStyle = side === "ally" ? "#3f8ce0" : "#e04545";
-  ctx.fillRect(-54, -138, 108 * pct, 12);
+  ctx.fillRect(-54, barY, 108 * pct, 12);
   ctx.strokeStyle = "#333";
   ctx.lineWidth = 2;
-  ctx.strokeRect(-54, -138, 108, 12);
+  ctx.strokeRect(-54, barY, 108, 12);
   ctx.restore();
 }
 
@@ -1036,7 +1129,7 @@ function render() {
   ctx.stroke();
 
   drawBase(LEFT_BASE_X, "enemy", battle.enemyBaseHp, battle.enemyBaseMaxHp);
-  drawBase(RIGHT_BASE_X, "ally", battle.playerBaseHp, PLAYER_BASE_MAX_HP);
+  drawBase(RIGHT_BASE_X, "ally", battle.playerBaseHp, battle.playerBaseMaxHp);
   for (const u of battle.units) if (!u.dead) drawUnit(u);
   drawProjectiles();
 }
@@ -1092,7 +1185,7 @@ function gameLoop(now) {
     if (battle.autoSpawn) autoSpawnTick();
 
     document.getElementById("enemy-hp-fill").style.width = `${(battle.enemyBaseHp / battle.enemyBaseMaxHp) * 100}%`;
-    document.getElementById("player-hp-fill").style.width = `${(battle.playerBaseHp / PLAYER_BASE_MAX_HP) * 100}%`;
+    document.getElementById("player-hp-fill").style.width = `${(battle.playerBaseHp / battle.playerBaseMaxHp) * 100}%`;
     document.getElementById("money-label").textContent = `💰 ${Math.floor(battle.money)}`;
     updateUnitBarUI();
   }
