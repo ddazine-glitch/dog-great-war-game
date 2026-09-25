@@ -139,11 +139,13 @@ button {
   display: inline-block;
   margin-bottom: 6px;
 }
-.roster-card .avatar.stage-2 { filter: saturate(1.5) brightness(1.05) hue-rotate(200deg) drop-shadow(0 0 8px #6fbfff); }
-.roster-card .avatar.stage-3 { filter: saturate(1.9) brightness(1.2) hue-rotate(35deg) drop-shadow(0 0 14px #ffd23f); }
-.roster-card .badge {
-  position: absolute; right: -8px; bottom: -6px; font-size: 0.5em;
+.roster-card .avatar.stage-2 { filter: drop-shadow(0 0 8px #6fbfff); }
+.roster-card .avatar.stage-3 { filter: drop-shadow(0 0 14px #ffd23f); }
+.roster-card .badges {
+  position: absolute; right: -10px; bottom: -4px;
+  display: flex; gap: 2px;
 }
+.roster-card .badge { font-size: 0.42em; }
 .roster-card .name { font-weight: bold; margin-bottom: 2px; }
 .roster-card .stage-tag { font-size: .85em; color: #777; margin-bottom: 6px; }
 .progress-bar {

@@ -23,6 +23,45 @@ const ALLY_TYPES = [
   { id: "guidedog", name: "안내견", emoji: "🦮", cost: 100, cooldown: 4500, hp: 95,  atk: 18, range: 44, atkInterval: 850,  speed: 48 },
 ];
 
+// 진화 단계별로 색만 바뀌는 게 아니라 실루엣 자체가 달라지도록 캐릭터/장식 조합을 따로 정의한다
+const EVOLUTION_FORMS = {
+  hippo: [
+    { emoji: "🦛", accessories: [] },
+    { emoji: "🦛", accessories: [{ emoji: "🛡️", dx: -18, dy: -6, scale: 0.55 }] },
+    { emoji: "🦛", accessories: [{ emoji: "⚔️", dx: -20, dy: -10, scale: 0.6 }, { emoji: "🔥", dx: 16, dy: -26, scale: 0.55 }] },
+  ],
+  pig: [
+    { emoji: "🐷", accessories: [] },
+    { emoji: "🐷", accessories: [{ emoji: "🥊", dx: -16, dy: -8, scale: 0.5 }] },
+    { emoji: "🐗", accessories: [{ emoji: "🔥", dx: 16, dy: -24, scale: 0.55 }] },
+  ],
+  kingpig: [
+    { emoji: "🐖", accessories: [{ emoji: "👑", dx: 0, dy: -30, scale: 0.55 }] },
+    { emoji: "🐖", accessories: [{ emoji: "👑", dx: 0, dy: -32, scale: 0.65 }, { emoji: "🛡️", dx: -18, dy: -2, scale: 0.5 }] },
+    { emoji: "🐗", accessories: [{ emoji: "👑", dx: 0, dy: -34, scale: 0.8 }, { emoji: "✨", dx: 18, dy: -18, scale: 0.6 }] },
+  ],
+  dog: [
+    { emoji: "🐶", accessories: [] },
+    { emoji: "🐕", accessories: [{ emoji: "🦴", dx: -18, dy: 8, scale: 0.4 }] },
+    { emoji: "🐺", accessories: [{ emoji: "✨", dx: 16, dy: -22, scale: 0.55 }] },
+  ],
+  bulldog: [
+    { emoji: "🐶", accessories: [] },
+    { emoji: "🐕‍🦺", accessories: [] },
+    { emoji: "🦁", accessories: [{ emoji: "🛡️", dx: -18, dy: -4, scale: 0.5 }] },
+  ],
+  chicken: [
+    { emoji: "🍗", accessories: [] },
+    { emoji: "🍗", accessories: [{ emoji: "🔥", dx: 16, dy: -10, scale: 0.6 }] },
+    { emoji: "🍗", accessories: [{ emoji: "🔥", dx: 18, dy: -16, scale: 0.9 }, { emoji: "🔥", dx: -16, dy: -14, scale: 0.7 }] },
+  ],
+  guidedog: [
+    { emoji: "🦮", accessories: [] },
+    { emoji: "🦮", accessories: [{ emoji: "🎽", dx: -16, dy: 4, scale: 0.45 }] },
+    { emoji: "🦮", accessories: [{ emoji: "🕊️", dx: 18, dy: -26, scale: 0.6 }, { emoji: "✨", dx: -18, dy: -20, scale: 0.5 }] },
+  ],
+};
+
 const FRUITS = [
   { id: "red",    name: "빨강 열매", emoji: "🍎", flavor: "공격력" },
   { id: "orange", name: "주황 열매", emoji: "🍊", flavor: "체력" },
@@ -221,9 +260,10 @@ function renderRoster() {
     card.className = "roster-card";
     const threshold = prog.stage >= 3 ? FEEDS_TO_STAGE3 : (prog.stage === 1 ? FEEDS_TO_STAGE2 : FEEDS_TO_STAGE3);
     const pct = prog.stage >= 3 ? 100 : Math.min(100, Math.round((prog.feeds / threshold) * 100));
-    const badge = prog.stage >= 3 ? "✨" : (prog.stage === 2 ? "🛡️" : "");
+    const form = EVOLUTION_FORMS[type.id][prog.stage - 1];
+    const badges = form.accessories.map(a => `<span class="badge">${a.emoji}</span>`).join("");
     card.innerHTML = `
-      <div class="avatar stage-${prog.stage}">${type.emoji}<span class="badge">${badge}</span></div>
+      <div class="avatar stage-${prog.stage}">${form.emoji}<span class="badges">${badges}</span></div>
       <div class="name">${type.name}</div>
       <div class="stage-tag">${prog.stage}단계${prog.stage >= 3 ? " (최대)" : ""}</div>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
@@ -298,6 +338,7 @@ function startStage(stageDef) {
     stage: stageDef,
     units: [],
     effects: [],
+    projectiles: [],
     money: 100,
     enemyBaseHp: stageDef.enemyBaseMaxHp,
     enemyBaseMaxHp: stageDef.enemyBaseMaxHp,
@@ -305,7 +346,7 @@ function startStage(stageDef) {
     cooldowns: {},
     spawnTimer: 900,
     cannonCharge: 0,
-    cannonMax: 4200,
+    cannonMax: 9500,
     over: false,
     lastTime: performance.now(),
   };
@@ -476,27 +517,59 @@ function updateCannon(dt) {
   }
   document.getElementById("cannon-fill").style.width = `${(battle.cannonCharge / battle.cannonMax) * 100}%`;
 }
+const CANNON_FLIGHT_SPEED = 1500; // px/sec, 포탄이 화면을 가로지르는 속도
+
 function fireCannon(chargeRatio) {
   let best = null, bestX = -Infinity;
   for (const u of battle.units) {
     if (u.dead || u.side !== "enemy") continue;
     if (u.x > bestX) { bestX = u.x; best = u; }
   }
-  const dmg = Math.round((40 + battle.stage.globalIndex * 6) * chargeRatio);
-  spawnBurst(RIGHT_BASE_X - 30, LANE_Y, "#ffb85a");
-  if (best) {
-    // 대포알이 사정거리(내 기지~적 기지) 안의 첫 유닛에 명중
-    dealDamageToUnit(best, dmg);
-    best.x = Math.min(RIGHT_BASE_X - 20, best.x + 26);
-    spawnBurst(best.x, best.y, "#ffb85a");
-  } else {
-    // 가로막는 유닛이 없으면 포탄이 끝까지 날아가 적 기지에 직격
-    attackBase("ally", dmg);
-    spawnBurst(LEFT_BASE_X, LANE_Y, "#ffb85a");
-    spawnFloatText(LEFT_BASE_X, LANE_Y - 60, `기지 명중 -${dmg}`, "#e04545");
-  }
+  const dmg = Math.round((160 + battle.stage.globalIndex * 24) * chargeRatio);
+  // 포탄이 기지에서 실제로 발사되어 사정거리(내 기지~적 기지) 끝까지 날아간다
+  battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 46, target: best, dmg, hit: false });
+  spawnBurst(RIGHT_BASE_X - 30, LANE_Y - 46, "#ffb85a");
   playSfx("cannon");
   battle.cannonCharge = 0;
+}
+function updateProjectiles(dt) {
+  for (const p of battle.projectiles) {
+    const targetX = (p.target && !p.target.dead) ? p.target.x : LEFT_BASE_X;
+    const step = CANNON_FLIGHT_SPEED * (dt / 1000);
+    if (p.x - targetX <= step) {
+      p.x = targetX;
+      p.hit = true;
+      if (p.target && !p.target.dead) {
+        dealDamageToUnit(p.target, p.dmg);
+        p.target.x = Math.max(ENEMY_SPAWN_X, p.target.x - 30); // 넉백: 적 기지 쪽으로 밀려남
+        spawnBurst(p.target.x, p.target.y - 20, "#ffb85a");
+      } else {
+        attackBase("ally", p.dmg);
+        spawnBurst(LEFT_BASE_X, LANE_Y - 46, "#ffb85a");
+        spawnFloatText(LEFT_BASE_X, LANE_Y - 90, `기지 명중 -${p.dmg}`, "#e04545");
+      }
+    } else {
+      p.x -= step;
+    }
+  }
+  battle.projectiles = battle.projectiles.filter(p => !p.hit);
+}
+function drawProjectiles() {
+  for (const p of battle.projectiles) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    ctx.fillStyle = "#5a3a1c";
+    ctx.fill();
+    ctx.strokeStyle = "#2a1a0c";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.font = "16px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("💨", 20, 4);
+    ctx.restore();
+  }
 }
 document.getElementById("btn-cannon").addEventListener("click", () => {
   if (!battle || battle.over) return;
@@ -537,12 +610,6 @@ const CANVAS_SCALE = 2;
 canvas.width = CANVAS_W * CANVAS_SCALE;
 canvas.height = CANVAS_H * CANVAS_SCALE;
 ctx.scale(CANVAS_SCALE, CANVAS_SCALE);
-
-const STAGE_FILTER = {
-  1: "none",
-  2: "saturate(1.5) brightness(1.05) hue-rotate(200deg)",
-  3: "saturate(1.9) brightness(1.2) hue-rotate(35deg)",
-};
 
 function drawBase(x, side, hp, maxHp) {
   ctx.save();
@@ -612,10 +679,19 @@ function drawUnit(u) {
 
   ctx.font = "30px sans-serif";
   ctx.textAlign = "center";
-  if (u.side === "ally" && u.stage) ctx.filter = STAGE_FILTER[u.stage];
-  ctx.fillText(u.emoji, 0, 0);
-  ctx.filter = "none";
-  if (u.badge) ctx.fillText(u.badge, 12, -16);
+  if (u.side === "ally") {
+    const form = EVOLUTION_FORMS[u.typeId][(u.stage || 1) - 1];
+    ctx.fillText(form.emoji, 0, 0);
+    for (const acc of form.accessories) {
+      ctx.save();
+      ctx.font = `${30 * acc.scale}px sans-serif`;
+      ctx.fillText(acc.emoji, acc.dx, acc.dy);
+      ctx.restore();
+    }
+  } else {
+    ctx.fillText(u.emoji, 0, 0);
+    if (u.badge) ctx.fillText(u.badge, 12, -16);
+  }
   ctx.restore();
 
   const pct = Math.max(0, u.hp / u.maxHp);
@@ -672,6 +748,7 @@ function render() {
   drawBase(LEFT_BASE_X, "enemy", battle.enemyBaseHp, battle.enemyBaseMaxHp);
   drawBase(RIGHT_BASE_X, "ally", battle.playerBaseHp, PLAYER_BASE_MAX_HP);
   for (const u of battle.units) if (!u.dead) drawUnit(u);
+  drawProjectiles();
 }
 
 /* ===================== 유닛 바 UI 갱신 ===================== */
@@ -715,6 +792,7 @@ function gameLoop(now) {
     for (const u of battle.units) updateUnit(u, dt);
     battle.units = battle.units.filter(u => !u.dead);
     updateCannon(dt);
+    updateProjectiles(dt);
 
     document.getElementById("enemy-hp-fill").style.width = `${(battle.enemyBaseHp / battle.enemyBaseMaxHp) * 100}%`;
     document.getElementById("player-hp-fill").style.width = `${(battle.playerBaseHp / PLAYER_BASE_MAX_HP) * 100}%`;
