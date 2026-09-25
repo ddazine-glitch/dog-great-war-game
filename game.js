@@ -424,7 +424,7 @@ function startStage(stageDef) {
     cooldowns: {},
     spawnTimer: 900,
     cannonCharge: 0,
-    cannonMax: 9500,
+    cannonMax: 5000,
     autoSpawn: false,
     over: false,
     lastTime: performance.now(),
@@ -624,6 +624,7 @@ function updateCannon(dt) {
     fireCannon(1);
   }
   document.getElementById("cannon-fill").style.width = `${(battle.cannonCharge / battle.cannonMax) * 100}%`;
+  document.getElementById("cannon-label").textContent = battle.cannonCharge >= battle.cannonMax ? "🐶💥 발사!" : "🐶💥 대포 충전중";
 }
 const CANNON_FLIGHT_SPEED = 1500; // px/sec, 포탄이 화면을 가로지르는 속도
 
@@ -684,11 +685,6 @@ function drawProjectiles() {
     ctx.restore();
   }
 }
-document.getElementById("btn-cannon").addEventListener("click", () => {
-  if (!battle || battle.over) return;
-  const ratio = Math.max(0.35, battle.cannonCharge / battle.cannonMax);
-  fireCannon(ratio);
-});
 document.getElementById("btn-autospawn").addEventListener("click", (e) => {
   if (!battle || battle.over) return;
   battle.autoSpawn = !battle.autoSpawn;
