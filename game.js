@@ -633,7 +633,7 @@ function fireCannon(chargeRatio) {
     if (u.dead || u.side !== "enemy") continue;
     if (u.x > bestX) { bestX = u.x; best = u; }
   }
-  const dmg = Math.round((160 + battle.stage.globalIndex * 24) * chargeRatio);
+  const dmg = Math.round((420 + battle.stage.globalIndex * 60) * chargeRatio);
   // 포탄 대신 큰 파도가 기지에서 밀려나가 사정거리(내 기지~적 기지) 끝까지 휩쓸고 간다
   battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, target: best, dmg, hit: false, trail: [] });
   spawnBurst(RIGHT_BASE_X - 30, LANE_Y - 6, "#5ec8e8");
