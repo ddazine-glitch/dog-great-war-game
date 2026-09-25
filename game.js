@@ -1,10 +1,10 @@
 "use strict";
 
 /* ===================== 상수 ===================== */
-const CANVAS_W = 960, CANVAS_H = 360, LANE_Y = 250;
-const LEFT_BASE_X = 60, RIGHT_BASE_X = CANVAS_W - 60;
-const ALLY_SPAWN_X = RIGHT_BASE_X - 35;
-const ENEMY_SPAWN_X = LEFT_BASE_X + 35;
+const CANVAS_W = 1120, CANVAS_H = 460, LANE_Y = 340;
+const LEFT_BASE_X = 75, RIGHT_BASE_X = CANVAS_W - 75;
+const ALLY_SPAWN_X = RIGHT_BASE_X - 40;
+const ENEMY_SPAWN_X = LEFT_BASE_X + 40;
 const PLAYER_BASE_MAX_HP = 500;
 const SAVE_KEY = "doggreatwar_save_v1";
 
@@ -547,33 +547,55 @@ const STAGE_FILTER = {
 function drawBase(x, side, hp, maxHp) {
   ctx.save();
   ctx.translate(x, LANE_Y);
+  ctx.beginPath();
+  ctx.ellipse(0, 6, 50, 14, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,.18)";
+  ctx.fill();
   ctx.fillStyle = side === "ally" ? "#7fb8e8" : "#e88a8a";
-  ctx.fillRect(-40, -92, 80, 92);
-  ctx.font = "50px sans-serif";
+  ctx.strokeStyle = side === "ally" ? "#2f6ca8" : "#a83f3f";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.roundRect(-52, -118, 104, 122, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.font = "68px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(side === "ally" ? "🐶" : "😾", 0, -44);
+  ctx.fillText(side === "ally" ? "🐶" : "😾", 0, -55);
   const pct = Math.max(0, hp / maxHp);
-  ctx.fillStyle = "#ddd";
-  ctx.fillRect(-42, -108, 84, 10);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(-54, -138, 108, 12);
   ctx.fillStyle = side === "ally" ? "#3f8ce0" : "#e04545";
-  ctx.fillRect(-42, -108, 84 * pct, 10);
+  ctx.fillRect(-54, -138, 108 * pct, 12);
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-54, -138, 108, 12);
   ctx.restore();
 }
 
 function drawUnit(u) {
   ctx.save();
-  const bob = Math.sin(performance.now() / 180 + u.x) * 2;
-  let scale = 1 + (u.spawnAnim > 0 ? (u.spawnAnim / 260) * 0.6 : 0);
-  if (u.side === "enemy" && u.tier) scale *= 1 + (u.tier - 1) * 0.16;
-  if (u.side === "ally" && u.stage) scale *= 1 + (u.stage - 1) * 0.22;
+  const bob = Math.sin(performance.now() / 180 + u.x) * 3;
+  let scale = 1.7 + (u.spawnAnim > 0 ? (u.spawnAnim / 260) * 0.7 : 0);
+  if (u.side === "enemy" && u.tier) scale *= 1 + (u.tier - 1) * 0.2;
+  if (u.side === "ally" && u.stage) scale *= 1 + (u.stage - 1) * 0.28;
+
+  // 발밑 그림자 (땅에 붙어있는 느낌)
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(u.x, u.y + 30, 22 * scale * 0.6, 7 * scale * 0.6, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,.2)";
+  ctx.fill();
+  ctx.restore();
+
   ctx.translate(u.x, u.y + bob);
-  ctx.scale(u.side === "ally" ? -scale : scale, scale);
+  // 이모지 기본 방향(왼쪽)을 기준으로, 오른쪽으로 걷는 적군만 좌우 반전한다
+  ctx.scale(u.side === "enemy" ? -scale : scale, scale);
 
   if (u.side === "ally" && u.stage >= 2) {
     ctx.save();
     ctx.globalAlpha = 0.3 + 0.18 * Math.sin(performance.now() / 150);
     ctx.beginPath();
-    ctx.arc(0, -22, u.stage >= 3 ? 34 : 28, 0, Math.PI * 2);
+    ctx.arc(0, -14, u.stage >= 3 ? 22 : 18, 0, Math.PI * 2);
     ctx.fillStyle = u.stage >= 3 ? "#ffd23f" : "#7fd0ff";
     ctx.fill();
     ctx.restore();
@@ -582,27 +604,32 @@ function drawUnit(u) {
     ctx.save();
     ctx.globalAlpha = Math.min(0.6, u.hitFlash / 140);
     ctx.beginPath();
-    ctx.arc(0, -22, 28, 0, Math.PI * 2);
+    ctx.arc(0, -14, 18, 0, Math.PI * 2);
     ctx.fillStyle = "#fff";
     ctx.fill();
     ctx.restore();
   }
 
-  ctx.font = "46px sans-serif";
+  ctx.font = "30px sans-serif";
   ctx.textAlign = "center";
   if (u.side === "ally" && u.stage) ctx.filter = STAGE_FILTER[u.stage];
   ctx.fillText(u.emoji, 0, 0);
   ctx.filter = "none";
-  if (u.badge) ctx.fillText(u.badge, 18, -26);
+  if (u.badge) ctx.fillText(u.badge, 12, -16);
   ctx.restore();
 
   const pct = Math.max(0, u.hp / u.maxHp);
+  const barY = u.y - (30 * scale * 0.9 + 14);
+  const barW = 26 * scale * 0.6 + 14;
   ctx.save();
-  ctx.translate(u.x, u.y - 48);
-  ctx.fillStyle = "#ddd";
-  ctx.fillRect(-20, 0, 40, 6);
+  ctx.translate(u.x, barY);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(-barW / 2, 0, barW, 7);
   ctx.fillStyle = u.side === "ally" ? "#3f8ce0" : "#e04545";
-  ctx.fillRect(-20, 0, 40 * pct, 6);
+  ctx.fillRect(-barW / 2, 0, barW * pct, 7);
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(-barW / 2, 0, barW, 7);
   ctx.restore();
 }
 
