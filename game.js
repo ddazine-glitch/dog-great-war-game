@@ -8,10 +8,11 @@ const ENEMY_SPAWN_X = LEFT_BASE_X + 40;
 const PLAYER_BASE_MAX_HP = 500;
 const SAVE_KEY = "doggreatwar_save_v1";
 
-const STAGE_HP_MUL = { 1: 1, 2: 1.6, 3: 2.6 };
-const STAGE_ATK_MUL = { 1: 1, 2: 1.5, 3: 2.2 };
-const FEEDS_TO_STAGE2 = 3;
-const FEEDS_TO_STAGE3 = 8;
+const STAGE_MAX = 6;
+const STAGE_HP_MUL = { 1: 1, 2: 1.5, 3: 2.1, 4: 2.8, 5: 3.6, 6: 4.6 };
+const STAGE_ATK_MUL = { 1: 1, 2: 1.4, 3: 1.9, 4: 2.5, 5: 3.2, 6: 4.0 };
+// 다음 단계로 올라가는 데 필요한 "누적" 열매 급여 횟수 (단계별)
+const STAGE_UP_THRESHOLDS = { 2: 3, 3: 7, 4: 12, 5: 18, 6: 25 };
 
 const ALLY_TYPES = [
   { id: "hippo",    name: "하마",   emoji: "🦛", cost: 50,  cooldown: 2600, hp: 130, atk: 11, range: 42, atkInterval: 1200, speed: 34 },
@@ -21,6 +22,12 @@ const ALLY_TYPES = [
   { id: "bulldog",  name: "불독",   emoji: "🐕", cost: 60,  cooldown: 2600, hp: 150, atk: 13, range: 34, atkInterval: 1100, speed: 28 },
   { id: "chicken",  name: "닭다리", emoji: "🍗", cost: 70,  cooldown: 3000, hp: 55,  atk: 22, range: 50, atkInterval: 700,  speed: 40 },
   { id: "guidedog", name: "안내견", emoji: "🦮", cost: 100, cooldown: 4500, hp: 95,  atk: 18, range: 44, atkInterval: 850,  speed: 48 },
+  { id: "squirrel", name: "다람쥐", emoji: "🐿️", cost: 15,  cooldown: 900,  hp: 20,  atk: 4,  range: 28, atkInterval: 600,  speed: 72 },
+  { id: "fox",      name: "여우",   emoji: "🦊", cost: 45,  cooldown: 2000, hp: 55,  atk: 14, range: 34, atkInterval: 800,  speed: 62 },
+  { id: "raccoon",  name: "너구리", emoji: "🦝", cost: 65,  cooldown: 2400, hp: 65,  atk: 12, range: 40, atkInterval: 950,  speed: 42, aoe: true },
+  { id: "owl",      name: "부엉이", emoji: "🦉", cost: 65,  cooldown: 2400, hp: 48,  atk: 15, range: 72, atkInterval: 1000, speed: 36 },
+  { id: "bear",     name: "곰",     emoji: "🐻", cost: 85,  cooldown: 3200, hp: 220, atk: 14, range: 36, atkInterval: 1300, speed: 22 },
+  { id: "elephant", name: "코끼리", emoji: "🐘", cost: 130, cooldown: 5200, hp: 260, atk: 30, range: 46, atkInterval: 1400, speed: 20 },
 ];
 
 // 진화 단계별로 색만 바뀌는 게 아니라 실루엣 자체가 달라지도록 캐릭터/장식 조합을 따로 정의한다
@@ -28,37 +35,106 @@ const EVOLUTION_FORMS = {
   hippo: [
     { emoji: "🦛", accessories: [] },
     { emoji: "🦛", accessories: [{ emoji: "🛡️", dx: -18, dy: -6, scale: 0.55 }] },
+    { emoji: "🦛", accessories: [{ emoji: "🛡️", dx: -18, dy: -6, scale: 0.55 }, { emoji: "⚔️", dx: 18, dy: -10, scale: 0.55 }] },
     { emoji: "🦛", accessories: [{ emoji: "⚔️", dx: -20, dy: -10, scale: 0.6 }, { emoji: "🔥", dx: 16, dy: -26, scale: 0.55 }] },
+    { emoji: "🦛", accessories: [{ emoji: "⚔️", dx: -20, dy: -10, scale: 0.65 }, { emoji: "🔥", dx: 16, dy: -26, scale: 0.65 }, { emoji: "👑", dx: 0, dy: -34, scale: 0.5 }] },
+    { emoji: "🦛", accessories: [{ emoji: "⚔️", dx: -20, dy: -10, scale: 0.7 }, { emoji: "🔥", dx: 18, dy: -28, scale: 0.8 }, { emoji: "👑", dx: 0, dy: -36, scale: 0.6 }, { emoji: "✨", dx: -14, dy: -30, scale: 0.5 }] },
   ],
   pig: [
     { emoji: "🐷", accessories: [] },
     { emoji: "🐷", accessories: [{ emoji: "🥊", dx: -16, dy: -8, scale: 0.5 }] },
+    { emoji: "🐗", accessories: [{ emoji: "🥊", dx: -16, dy: -8, scale: 0.55 }] },
     { emoji: "🐗", accessories: [{ emoji: "🔥", dx: 16, dy: -24, scale: 0.55 }] },
+    { emoji: "🐗", accessories: [{ emoji: "💪", dx: -16, dy: -6, scale: 0.55 }, { emoji: "🔥", dx: 16, dy: -24, scale: 0.6 }] },
+    { emoji: "🐗", accessories: [{ emoji: "💪", dx: -16, dy: -6, scale: 0.6 }, { emoji: "🔥", dx: 16, dy: -26, scale: 0.8 }, { emoji: "✨", dx: -14, dy: -26, scale: 0.5 }] },
   ],
   kingpig: [
     { emoji: "🐖", accessories: [{ emoji: "👑", dx: 0, dy: -30, scale: 0.55 }] },
     { emoji: "🐖", accessories: [{ emoji: "👑", dx: 0, dy: -32, scale: 0.65 }, { emoji: "🛡️", dx: -18, dy: -2, scale: 0.5 }] },
-    { emoji: "🐗", accessories: [{ emoji: "👑", dx: 0, dy: -34, scale: 0.8 }, { emoji: "✨", dx: 18, dy: -18, scale: 0.6 }] },
+    { emoji: "🐗", accessories: [{ emoji: "👑", dx: 0, dy: -32, scale: 0.65 }, { emoji: "🛡️", dx: -18, dy: -2, scale: 0.5 }] },
+    { emoji: "🐗", accessories: [{ emoji: "👑", dx: 0, dy: -34, scale: 0.7 }, { emoji: "🛡️", dx: -18, dy: -2, scale: 0.55 }, { emoji: "⚔️", dx: 18, dy: -6, scale: 0.5 }] },
+    { emoji: "🐗", accessories: [{ emoji: "👑", dx: 0, dy: -36, scale: 0.8 }, { emoji: "💎", dx: -18, dy: -8, scale: 0.5 }, { emoji: "⚔️", dx: 18, dy: -8, scale: 0.55 }] },
+    { emoji: "🐗", accessories: [{ emoji: "👑", dx: 0, dy: -38, scale: 0.9 }, { emoji: "💎", dx: -18, dy: -10, scale: 0.55 }, { emoji: "✨", dx: 18, dy: -20, scale: 0.65 }, { emoji: "🔥", dx: 0, dy: 6, scale: 0.5 }] },
   ],
   dog: [
     { emoji: "🐶", accessories: [] },
     { emoji: "🐕", accessories: [{ emoji: "🦴", dx: -18, dy: 8, scale: 0.4 }] },
+    { emoji: "🐕", accessories: [{ emoji: "🦴", dx: -18, dy: 8, scale: 0.4 }, { emoji: "🛡️", dx: 16, dy: -6, scale: 0.45 }] },
+    { emoji: "🐺", accessories: [{ emoji: "🦴", dx: -18, dy: 8, scale: 0.4 }] },
     { emoji: "🐺", accessories: [{ emoji: "✨", dx: 16, dy: -22, scale: 0.55 }] },
+    { emoji: "🐺", accessories: [{ emoji: "✨", dx: 16, dy: -22, scale: 0.7 }, { emoji: "🔥", dx: -16, dy: -20, scale: 0.6 }] },
   ],
   bulldog: [
     { emoji: "🐶", accessories: [] },
     { emoji: "🐕‍🦺", accessories: [] },
+    { emoji: "🐕‍🦺", accessories: [{ emoji: "🛡️", dx: -18, dy: -4, scale: 0.5 }] },
+    { emoji: "🦁", accessories: [] },
     { emoji: "🦁", accessories: [{ emoji: "🛡️", dx: -18, dy: -4, scale: 0.5 }] },
+    { emoji: "🦁", accessories: [{ emoji: "🛡️", dx: -18, dy: -4, scale: 0.6 }, { emoji: "✨", dx: 16, dy: -22, scale: 0.55 }] },
   ],
   chicken: [
     { emoji: "🍗", accessories: [] },
     { emoji: "🍗", accessories: [{ emoji: "🔥", dx: 16, dy: -10, scale: 0.6 }] },
+    { emoji: "🍗", accessories: [{ emoji: "🔥", dx: 16, dy: -10, scale: 0.6 }, { emoji: "🔥", dx: -14, dy: -10, scale: 0.5 }] },
     { emoji: "🍗", accessories: [{ emoji: "🔥", dx: 18, dy: -16, scale: 0.9 }, { emoji: "🔥", dx: -16, dy: -14, scale: 0.7 }] },
+    { emoji: "🍗", accessories: [{ emoji: "🔥", dx: 18, dy: -16, scale: 0.9 }, { emoji: "🔥", dx: -16, dy: -14, scale: 0.8 }, { emoji: "⚡", dx: 0, dy: -30, scale: 0.6 }] },
+    { emoji: "🍗", accessories: [{ emoji: "🔥", dx: 18, dy: -18, scale: 1.0 }, { emoji: "🔥", dx: -18, dy: -16, scale: 0.9 }, { emoji: "⚡", dx: 0, dy: -32, scale: 0.7 }, { emoji: "✨", dx: 0, dy: 8, scale: 0.5 }] },
   ],
   guidedog: [
     { emoji: "🦮", accessories: [] },
     { emoji: "🦮", accessories: [{ emoji: "🎽", dx: -16, dy: 4, scale: 0.45 }] },
+    { emoji: "🦮", accessories: [{ emoji: "🎽", dx: -16, dy: 4, scale: 0.45 }, { emoji: "🕊️", dx: 18, dy: -24, scale: 0.5 }] },
     { emoji: "🦮", accessories: [{ emoji: "🕊️", dx: 18, dy: -26, scale: 0.6 }, { emoji: "✨", dx: -18, dy: -20, scale: 0.5 }] },
+    { emoji: "🦮", accessories: [{ emoji: "🕊️", dx: 18, dy: -26, scale: 0.7 }, { emoji: "✨", dx: -18, dy: -20, scale: 0.6 }] },
+    { emoji: "🦮", accessories: [{ emoji: "🕊️", dx: 18, dy: -28, scale: 0.85 }, { emoji: "✨", dx: -18, dy: -22, scale: 0.7 }, { emoji: "💫", dx: 0, dy: -34, scale: 0.6 }] },
+  ],
+  squirrel: [
+    { emoji: "🐿️", accessories: [] },
+    { emoji: "🐿️", accessories: [{ emoji: "🌰", dx: -16, dy: 6, scale: 0.4 }] },
+    { emoji: "🐿️", accessories: [{ emoji: "🌰", dx: -16, dy: 6, scale: 0.4 }, { emoji: "🌰", dx: 16, dy: 6, scale: 0.4 }] },
+    { emoji: "🐿️", accessories: [{ emoji: "🌰", dx: -16, dy: 6, scale: 0.4 }, { emoji: "💨", dx: 16, dy: -6, scale: 0.5 }] },
+    { emoji: "🐿️", accessories: [{ emoji: "💨", dx: 16, dy: -6, scale: 0.6 }, { emoji: "✨", dx: -16, dy: -18, scale: 0.5 }] },
+    { emoji: "🐿️", accessories: [{ emoji: "💨", dx: 16, dy: -8, scale: 0.7 }, { emoji: "✨", dx: -16, dy: -18, scale: 0.6 }, { emoji: "⚡", dx: 0, dy: -28, scale: 0.5 }] },
+  ],
+  fox: [
+    { emoji: "🦊", accessories: [] },
+    { emoji: "🦊", accessories: [{ emoji: "🗡️", dx: -18, dy: -6, scale: 0.5 }] },
+    { emoji: "🦊", accessories: [{ emoji: "🗡️", dx: -18, dy: -6, scale: 0.5 }, { emoji: "🌙", dx: 16, dy: -24, scale: 0.5 }] },
+    { emoji: "🦊", accessories: [{ emoji: "🗡️", dx: -18, dy: -6, scale: 0.65 }, { emoji: "🌙", dx: 16, dy: -24, scale: 0.55 }] },
+    { emoji: "🦊", accessories: [{ emoji: "🗡️", dx: -18, dy: -6, scale: 0.7 }, { emoji: "🌙", dx: 16, dy: -24, scale: 0.6 }, { emoji: "✨", dx: 0, dy: -28, scale: 0.5 }] },
+    { emoji: "🦊", accessories: [{ emoji: "🗡️", dx: -18, dy: -6, scale: 0.85 }, { emoji: "🌙", dx: 16, dy: -26, scale: 0.75 }, { emoji: "🔥", dx: 0, dy: -30, scale: 0.6 }] },
+  ],
+  raccoon: [
+    { emoji: "🦝", accessories: [] },
+    { emoji: "🦝", accessories: [{ emoji: "🪨", dx: -18, dy: -4, scale: 0.5 }] },
+    { emoji: "🦝", accessories: [{ emoji: "🪨", dx: -18, dy: -4, scale: 0.5 }, { emoji: "🪨", dx: 16, dy: -4, scale: 0.4 }] },
+    { emoji: "🦝", accessories: [{ emoji: "💥", dx: 16, dy: -14, scale: 0.6 }] },
+    { emoji: "🦝", accessories: [{ emoji: "💥", dx: 16, dy: -14, scale: 0.7 }, { emoji: "✨", dx: -16, dy: -20, scale: 0.5 }] },
+    { emoji: "🦝", accessories: [{ emoji: "💥", dx: 16, dy: -16, scale: 0.9 }, { emoji: "✨", dx: -16, dy: -20, scale: 0.6 }, { emoji: "🔥", dx: 0, dy: 6, scale: 0.5 }] },
+  ],
+  owl: [
+    { emoji: "🦉", accessories: [] },
+    { emoji: "🦉", accessories: [{ emoji: "🏹", dx: -18, dy: -6, scale: 0.5 }] },
+    { emoji: "🦉", accessories: [{ emoji: "🏹", dx: -18, dy: -6, scale: 0.5 }, { emoji: "🌙", dx: 16, dy: -24, scale: 0.5 }] },
+    { emoji: "🦉", accessories: [{ emoji: "🏹", dx: -18, dy: -6, scale: 0.65 }, { emoji: "🌙", dx: 16, dy: -24, scale: 0.55 }] },
+    { emoji: "🦉", accessories: [{ emoji: "🏹", dx: -18, dy: -6, scale: 0.7 }, { emoji: "🌙", dx: 16, dy: -24, scale: 0.6 }, { emoji: "✨", dx: 0, dy: -30, scale: 0.5 }] },
+    { emoji: "🦉", accessories: [{ emoji: "🏹", dx: -18, dy: -6, scale: 0.85 }, { emoji: "🌙", dx: 16, dy: -26, scale: 0.75 }, { emoji: "✨", dx: 0, dy: -32, scale: 0.7 }] },
+  ],
+  bear: [
+    { emoji: "🐻", accessories: [] },
+    { emoji: "🐻", accessories: [{ emoji: "🛡️", dx: -18, dy: -6, scale: 0.5 }] },
+    { emoji: "🐻", accessories: [{ emoji: "🛡️", dx: -18, dy: -6, scale: 0.65 }] },
+    { emoji: "🐻‍❄️", accessories: [{ emoji: "🛡️", dx: -18, dy: -6, scale: 0.55 }] },
+    { emoji: "🐻‍❄️", accessories: [{ emoji: "🛡️", dx: -18, dy: -6, scale: 0.6 }, { emoji: "⚔️", dx: 18, dy: -10, scale: 0.55 }] },
+    { emoji: "🐻‍❄️", accessories: [{ emoji: "🛡️", dx: -18, dy: -6, scale: 0.75 }, { emoji: "⚔️", dx: 18, dy: -10, scale: 0.65 }, { emoji: "✨", dx: 0, dy: -30, scale: 0.55 }] },
+  ],
+  elephant: [
+    { emoji: "🐘", accessories: [] },
+    { emoji: "🐘", accessories: [{ emoji: "🛡️", dx: -20, dy: -6, scale: 0.5 }] },
+    { emoji: "🐘", accessories: [{ emoji: "🛡️", dx: -20, dy: -6, scale: 0.5 }, { emoji: "⚔️", dx: 18, dy: -10, scale: 0.5 }] },
+    { emoji: "🐘", accessories: [{ emoji: "🛡️", dx: -20, dy: -6, scale: 0.65 }, { emoji: "⚔️", dx: 18, dy: -10, scale: 0.55 }] },
+    { emoji: "🐘", accessories: [{ emoji: "🛡️", dx: -20, dy: -6, scale: 0.7 }, { emoji: "⚔️", dx: 18, dy: -10, scale: 0.6 }, { emoji: "👑", dx: 0, dy: -34, scale: 0.5 }] },
+    { emoji: "🐘", accessories: [{ emoji: "🛡️", dx: -20, dy: -6, scale: 0.85 }, { emoji: "⚔️", dx: 18, dy: -10, scale: 0.75 }, { emoji: "👑", dx: 0, dy: -36, scale: 0.6 }, { emoji: "✨", dx: -18, dy: -26, scale: 0.5 }] },
   ],
 };
 
@@ -98,11 +174,11 @@ const STAGES = (() => {
         label: `${chapter}-${s}`,
         chapter, stageNum: s, globalIndex: gi,
         tierPool: pool,
-        enemyBaseMaxHp: 260 + gi * 130,
-        spawnInterval: Math.max(950, 2500 - gi * 140),
-        catStatMul: 1 + (gi - 1) * 0.16,
-        moneyPerTick: 4 + gi * 0.4,
-        fruitReward: 1 + Math.floor(gi / 2),
+        enemyBaseMaxHp: 260 + gi * 110,
+        spawnInterval: Math.max(1150, 2600 - gi * 110),
+        catStatMul: 1 + (gi - 1) * 0.11,
+        moneyPerTick: 5 + gi * 0.55,
+        fruitReward: 2 + Math.floor(gi / 1.5),
         isBoss: false,
       });
     }
@@ -110,8 +186,8 @@ const STAGES = (() => {
   list.push({
     id: "boss", label: "최종 보스", chapter: 4, stageNum: 1, globalIndex: gi + 1,
     tierPool: [1, 2, 3], includeBoss: true,
-    enemyBaseMaxHp: 3600, spawnInterval: 1500, catStatMul: 2.1,
-    moneyPerTick: 8, fruitReward: 12, isBoss: true,
+    enemyBaseMaxHp: 3200, spawnInterval: 1600, catStatMul: 1.8,
+    moneyPerTick: 10, fruitReward: 15, isBoss: true,
   });
   return list;
 })();
@@ -154,22 +230,21 @@ function getAllyStats(typeId) {
 function feedFruit(typeId, fruitId) {
   if (save.fruits[fruitId] <= 0) return false;
   const prog = save.allies[typeId];
-  if (prog.stage >= 3) return false;
+  if (prog.stage >= STAGE_MAX) return false;
   save.fruits[fruitId]--;
   const base = ALLY_TYPES.find(t => t.id === typeId);
-  if (fruitId === "red") prog.bonus.atk += base.atk * 0.10;
-  else if (fruitId === "orange") prog.bonus.hp += base.hp * 0.12;
-  else if (fruitId === "yellow") prog.bonus.atkSpeed = Math.min(0.4, prog.bonus.atkSpeed + 0.05);
-  else if (fruitId === "green") prog.bonus.speed += 0.07;
-  else if (fruitId === "purple") prog.bonus.range += 3;
+  if (fruitId === "red") prog.bonus.atk += base.atk * 0.05;
+  else if (fruitId === "orange") prog.bonus.hp += base.hp * 0.06;
+  else if (fruitId === "yellow") prog.bonus.atkSpeed = Math.min(0.4, prog.bonus.atkSpeed + 0.025);
+  else if (fruitId === "green") prog.bonus.speed += 0.03;
+  else if (fruitId === "purple") prog.bonus.range += 1.5;
   prog.feeds++;
-  const threshold = prog.stage === 1 ? FEEDS_TO_STAGE2 : FEEDS_TO_STAGE3;
-  if (prog.feeds >= threshold && prog.stage < 3) {
+  let leveledUp = false;
+  while (prog.stage < STAGE_MAX && prog.feeds >= STAGE_UP_THRESHOLDS[prog.stage + 1]) {
     prog.stage++;
-    playSfx("evolve");
-  } else {
-    playSfx("feed");
+    leveledUp = true;
   }
+  playSfx(leveledUp ? "evolve" : "feed");
   persistSave();
   return true;
 }
@@ -258,14 +333,14 @@ function renderRoster() {
     const prog = save.allies[type.id];
     const card = document.createElement("div");
     card.className = "roster-card";
-    const threshold = prog.stage >= 3 ? FEEDS_TO_STAGE3 : (prog.stage === 1 ? FEEDS_TO_STAGE2 : FEEDS_TO_STAGE3);
-    const pct = prog.stage >= 3 ? 100 : Math.min(100, Math.round((prog.feeds / threshold) * 100));
+    const atMax = prog.stage >= STAGE_MAX;
+    const pct = atMax ? 100 : Math.min(100, Math.round((prog.feeds / STAGE_UP_THRESHOLDS[prog.stage + 1]) * 100));
     const form = EVOLUTION_FORMS[type.id][prog.stage - 1];
     const badges = form.accessories.map(a => `<span class="badge">${a.emoji}</span>`).join("");
     card.innerHTML = `
       <div class="avatar stage-${prog.stage}">${form.emoji}<span class="badges">${badges}</span></div>
       <div class="name">${type.name}</div>
-      <div class="stage-tag">${prog.stage}단계${prog.stage >= 3 ? " (최대)" : ""}</div>
+      <div class="stage-tag">${prog.stage}/${STAGE_MAX}단계${atMax ? " (최대)" : ""}</div>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       <div class="feed-row"></div>
     `;
@@ -275,7 +350,7 @@ function renderRoster() {
       b.className = "feed-btn";
       b.textContent = `${f.emoji}${save.fruits[f.id]}`;
       b.title = f.flavor;
-      b.disabled = prog.stage >= 3 || save.fruits[f.id] <= 0;
+      b.disabled = atMax || save.fruits[f.id] <= 0;
       b.addEventListener("click", () => {
         if (feedFruit(type.id, f.id)) renderRoster();
       });
@@ -297,6 +372,7 @@ class Unit {
     this.dead = false;
     this.hitFlash = 0;
     this.spawnAnim = 260;
+    this.attackAnim = 0;
   }
 }
 
@@ -313,6 +389,7 @@ function createAlly(typeId) {
   u.speed = stats.speed;
   u.atkInterval = stats.atkInterval;
   u.stage = stats.stage;
+  u.aoe = !!stats.base.aoe;
   return u;
 }
 
@@ -339,7 +416,7 @@ function startStage(stageDef) {
     units: [],
     effects: [],
     projectiles: [],
-    money: 100,
+    money: 100 + stageDef.globalIndex * 10,
     enemyBaseHp: stageDef.enemyBaseMaxHp,
     enemyBaseMaxHp: stageDef.enemyBaseMaxHp,
     playerBaseHp: PLAYER_BASE_MAX_HP,
@@ -395,13 +472,16 @@ function trySpawnAlly(typeId) {
   battle.money -= stats.base.cost;
   battle.cooldowns[typeId] = stats.base.cooldown;
   battle.units.push(createAlly(typeId));
-  spawnBurst(ALLY_SPAWN_X, LANE_Y, "#8fd3ff");
+  spawnImpact(ALLY_SPAWN_X, LANE_Y - 10, "#8fd3ff");
   playSfx("spawnAlly");
 }
 
 /* ===================== 이펙트 ===================== */
 function spawnBurst(x, y, color) {
   battle.effects.push({ type: "burst", x, y, life: 350, maxLife: 350, color });
+}
+function spawnImpact(x, y, color) {
+  battle.effects.push({ type: "impact", x, y, life: 420, maxLife: 420, color });
 }
 function spawnFloatText(x, y, text, color) {
   battle.effects.push({ type: "text", x, y, life: 700, maxLife: 700, text, color: color || "#333" });
@@ -440,7 +520,7 @@ function onUnitDeath(unit) {
     const reward = 6 + unit.tier * 4;
     battle.money += reward;
     spawnFloatText(unit.x, unit.y - 30, `+${reward}💰`, "#b8860b");
-    if (Math.random() < 0.15) {
+    if (Math.random() < 0.22) {
       const f = FRUITS[Math.floor(Math.random() * FRUITS.length)];
       save.fruits[f.id]++;
       spawnFloatText(unit.x, unit.y - 50, f.emoji, "#333");
@@ -474,7 +554,18 @@ function updateUnit(u, dt) {
     if (found.dist <= u.range) {
       if (u.atkTimer <= 0) {
         dealDamageToUnit(found.target, u.atk);
+        if (u.aoe) {
+          // 너구리처럼 광역 공격형 유닛은 주 타겟 옆의 다른 적에게도 약한 스플래시 피해를 준다
+          let splash = null, splashDist = Infinity;
+          for (const o of battle.units) {
+            if (o.dead || o.side === u.side || o === found.target) continue;
+            const d = Math.abs(o.x - u.x);
+            if (d <= u.range && d < splashDist) { splashDist = d; splash = o; }
+          }
+          if (splash) dealDamageToUnit(splash, Math.round(u.atk * 0.4));
+        }
         u.atkTimer = u.atkInterval;
+        u.attackAnim = 180;
       }
     } else {
       const proposed = u.x + dir * u.speed * (dt / 1000);
@@ -488,6 +579,7 @@ function updateUnit(u, dt) {
       if (u.atkTimer <= 0) {
         attackBase(u.side, u.atk);
         u.atkTimer = u.atkInterval;
+        u.attackAnim = 180;
         spawnHitSpark(baseX, LANE_Y - 30);
         playSfx("baseHit");
       }
@@ -495,6 +587,7 @@ function updateUnit(u, dt) {
       u.x += dir * u.speed * (dt / 1000);
     }
   }
+  if (u.attackAnim > 0) u.attackAnim -= dt;
 }
 
 function attackBase(attackerSide, dmg) {
@@ -644,7 +737,7 @@ function drawUnit(u) {
   const bob = Math.sin(performance.now() / 180 + u.x) * 3;
   let scale = 1.7 + (u.spawnAnim > 0 ? (u.spawnAnim / 260) * 0.7 : 0);
   if (u.side === "enemy" && u.tier) scale *= 1 + (u.tier - 1) * 0.2;
-  if (u.side === "ally" && u.stage) scale *= 1 + (u.stage - 1) * 0.28;
+  if (u.side === "ally" && u.stage) scale *= 1 + (u.stage - 1) * 0.16;
 
   // 발밑 그림자 (땅에 붙어있는 느낌)
   ctx.save();
@@ -654,16 +747,21 @@ function drawUnit(u) {
   ctx.fill();
   ctx.restore();
 
-  ctx.translate(u.x, u.y + bob);
+  // 공격할 때 살짝 앞으로 튀어나갔다 돌아오는 타격 모션
+  const lungeDir = u.side === "ally" ? -1 : 1;
+  const lunge = u.attackAnim > 0 ? Math.sin((1 - u.attackAnim / 180) * Math.PI) * 11 * lungeDir : 0;
+
+  ctx.translate(u.x + lunge, u.y + bob);
   // 이모지 기본 방향(왼쪽)을 기준으로, 오른쪽으로 걷는 적군만 좌우 반전한다
   ctx.scale(u.side === "enemy" ? -scale : scale, scale);
 
   if (u.side === "ally" && u.stage >= 2) {
+    const auraColor = u.stage >= 6 ? "#ffd23f" : u.stage >= 4 ? "#c98bff" : "#7fd0ff";
     ctx.save();
     ctx.globalAlpha = 0.3 + 0.18 * Math.sin(performance.now() / 150);
     ctx.beginPath();
-    ctx.arc(0, -14, u.stage >= 3 ? 22 : 18, 0, Math.PI * 2);
-    ctx.fillStyle = u.stage >= 3 ? "#ffd23f" : "#7fd0ff";
+    ctx.arc(0, -14, 16 + u.stage * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = auraColor;
     ctx.fill();
     ctx.restore();
   }
@@ -722,6 +820,29 @@ function drawEffects(dt) {
       ctx.strokeStyle = e.color;
       ctx.lineWidth = 3;
       ctx.stroke();
+    } else if (e.type === "impact") {
+      // 소환/강한 타격을 더 임팩트 있게 보여주는 섬광+충격파+파편 이펙트
+      ctx.globalAlpha = Math.max(0, 1 - t * 3.2);
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.globalAlpha = 1 - t;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 12 + t * 42, 0, Math.PI * 2);
+      ctx.strokeStyle = e.color;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      for (let i = 0; i < 6; i++) {
+        const ang = (i / 6) * Math.PI * 2;
+        const r1 = 16 + t * 8, r2 = 16 + t * 50;
+        ctx.beginPath();
+        ctx.moveTo(e.x + Math.cos(ang) * r1, e.y + Math.sin(ang) * r1);
+        ctx.lineTo(e.x + Math.cos(ang) * r2, e.y + Math.sin(ang) * r2);
+        ctx.strokeStyle = e.color;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
     } else if (e.type === "spark") {
       ctx.globalAlpha = 1 - t;
       ctx.font = "18px sans-serif";
@@ -784,7 +905,7 @@ function gameLoop(now) {
     if (battle.spawnTimer <= 0) {
       const catId = pickCatId(battle.stage);
       battle.units.push(createEnemy(catId, battle.stage.catStatMul));
-      spawnBurst(ENEMY_SPAWN_X, LANE_Y, "#ff8a8a");
+      spawnImpact(ENEMY_SPAWN_X, LANE_Y - 10, "#ff8a8a");
       playSfx("spawnEnemy");
       battle.spawnTimer = battle.stage.spawnInterval;
     }

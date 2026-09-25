@@ -139,8 +139,11 @@ button {
   display: inline-block;
   margin-bottom: 6px;
 }
-.roster-card .avatar.stage-2 { filter: drop-shadow(0 0 8px #6fbfff); }
-.roster-card .avatar.stage-3 { filter: drop-shadow(0 0 14px #ffd23f); }
+.roster-card .avatar.stage-2 { filter: drop-shadow(0 0 6px #7fd0ff); }
+.roster-card .avatar.stage-3 { filter: drop-shadow(0 0 9px #7fd0ff); }
+.roster-card .avatar.stage-4 { filter: drop-shadow(0 0 10px #c98bff); }
+.roster-card .avatar.stage-5 { filter: drop-shadow(0 0 13px #c98bff); }
+.roster-card .avatar.stage-6 { filter: drop-shadow(0 0 16px #ffd23f); }
 .roster-card .badges {
   position: absolute; right: -10px; bottom: -4px;
   display: flex; gap: 2px;
