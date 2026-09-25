@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#87ceeb">
+<title>멍멍 대전쟁</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <section id="screen-title" class="screen active">
+    <h1>🐶 멍멍 대전쟁 🐱</h1>
+    <p class="subtitle">강아지 아군 vs 고양이 적군</p>
+    <button id="btn-start" class="big-btn">게임 시작</button>
+  </section>
+
+  <section id="screen-stageselect" class="screen">
+    <h2>스테이지 선택</h2>
+    <div id="stage-grid" class="stage-grid"></div>
+    <div class="row-buttons">
+      <button id="btn-open-roster" class="mid-btn">🍎 강아지 부대 강화</button>
+      <button id="btn-back-title" class="mid-btn ghost">처음으로</button>
+    </div>
+  </section>
+
+  <section id="screen-roster" class="screen">
+    <h2>강아지 부대 강화</h2>
+    <div id="fruit-bar" class="fruit-bar"></div>
+    <div id="roster-list" class="roster-list"></div>
+    <button id="btn-roster-back" class="mid-btn">뒤로</button>
+  </section>
+
+  <section id="screen-battle" class="screen">
+    <div id="battle-hud">
+      <div class="hp-block left">
+        <span class="hp-label">😾 고양이 기지</span>
+        <div class="hp-bar"><div id="enemy-hp-fill" class="hp-fill enemy"></div></div>
+      </div>
+      <div class="mid-info">
+        <div id="stage-label">1-1</div>
+        <div id="money-label">💰 0</div>
+      </div>
+      <div class="hp-block right">
+        <span class="hp-label">🐶 강아지 기지</span>
+        <div class="hp-bar"><div id="player-hp-fill" class="hp-fill player"></div></div>
+      </div>
+      <button id="btn-exit-battle" class="exit-btn">✕</button>
+    </div>
+
+    <canvas id="game-canvas" width="960" height="360"></canvas>
+
+    <div id="cannon-ui">
+      <div id="cannon-bar"><div id="cannon-fill"></div></div>
+      <button id="btn-cannon">🐶💥 대포 발사</button>
+    </div>
+
+    <div id="unit-bar"></div>
+  </section>
+
+  <div id="result-overlay" class="overlay hidden">
+    <div class="result-box">
+      <h2 id="result-title">승리!</h2>
+      <p id="result-desc"></p>
+      <button id="btn-result-continue" class="big-btn">계속</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
