@@ -451,7 +451,6 @@ class Unit {
     this.hitFlash = 0;
     this.spawnAnim = 260;
     this.attackAnim = 0;
-    this.manualOffsetX = 0;
     this.manualJumpT = 0;
     this.selected = false;
   }
@@ -664,7 +663,8 @@ function updateUnit(u, dt) {
         u.atkTimer = u.atkInterval;
         u.attackAnim = 180;
       }
-    } else {
+    } else if (!u.selected) {
+      // 플레이어가 직접 조종 중인 캐릭터는 자동으로 앞으로 나가지 않는다
       const proposed = u.x + dir * u.speed * (dt / 1000);
       if (dir === -1) u.x = Math.max(proposed, found.target.x + u.range);
       else u.x = Math.min(proposed, found.target.x - u.range);
@@ -680,13 +680,11 @@ function updateUnit(u, dt) {
         spawnHitSpark(baseX, LANE_Y - 30);
         playSfx("baseHit");
       }
-    } else {
+    } else if (!u.selected) {
       u.x += dir * u.speed * (dt / 1000);
     }
   }
   if (u.attackAnim > 0) u.attackAnim -= dt;
-  if (u.manualOffsetX !== 0) u.manualOffsetX *= 0.9; // 살짝 밀었다가 스르륵 제자리로 돌아오는 느낌
-  if (Math.abs(u.manualOffsetX) < 0.5) u.manualOffsetX = 0;
   if (u.manualJumpT > 0) u.manualJumpT -= dt;
 }
 
@@ -841,7 +839,9 @@ canvas.addEventListener("click", (e) => {
 });
 function nudgeSelected(dir) {
   if (!selectedUnit || selectedUnit.dead) return;
-  selectedUnit.manualOffsetX = Math.max(-34, Math.min(34, selectedUnit.manualOffsetX + dir * 16));
+  // 조종 중인 캐릭터는 자동으로 전진하지 않으므로, 실제 위치를 직접 옮겨준다
+  const min = ENEMY_SPAWN_X - 20, max = ALLY_SPAWN_X + 20;
+  selectedUnit.x = Math.max(min, Math.min(max, selectedUnit.x + dir * 22));
 }
 function jumpSelected() {
   if (!selectedUnit || selectedUnit.dead) return;
@@ -907,11 +907,10 @@ function drawUnit(u) {
   // 공격할 때 살짝 앞으로 튀어나갔다 돌아오는 타격 모션
   const lungeDir = u.side === "ally" ? -1 : 1;
   const lunge = u.attackAnim > 0 ? Math.sin((1 - u.attackAnim / 180) * Math.PI) * 11 * lungeDir : 0;
-  // 플레이어가 직접 조종할 때 쓰는 살짝 밀기 + 점프 연출 (전투 계산에는 영향 없음)
-  const manualX = u.manualOffsetX || 0;
+  // 플레이어가 직접 조종할 때 쓰는 점프 연출 (좌우 이동은 실제 위치를 바꾸고, 점프만 연출용)
   const jumpHeight = u.manualJumpT > 0 ? Math.sin((1 - u.manualJumpT / 420) * Math.PI) * 26 : 0;
 
-  ctx.translate(u.x + lunge + manualX, u.y + bob - jumpHeight);
+  ctx.translate(u.x + lunge, u.y + bob - jumpHeight);
   // 이모지 기본 방향(왼쪽)을 기준으로, 오른쪽으로 걷는 적군만 좌우 반전한다
   ctx.scale(u.side === "enemy" ? -scale : scale, scale);
 
@@ -969,7 +968,7 @@ function drawUnit(u) {
   if (u.selected) {
     const markerBob = Math.sin(performance.now() / 130) * 4;
     ctx.save();
-    ctx.translate(u.x + manualX, barY - 22 + markerBob - jumpHeight);
+    ctx.translate(u.x, barY - 22 + markerBob - jumpHeight);
     ctx.font = "22px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("👆", 0, 0);
