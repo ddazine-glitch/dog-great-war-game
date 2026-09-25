@@ -110,6 +110,30 @@ button {
 .stage-btn.boss.cleared { background: #ffe08a; box-shadow: 0 3px 0 #d9a12d; }
 .row-buttons { margin-top: 10px; }
 
+.world-tabs { display: flex; justify-content: center; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+.world-tab {
+  border: none; border-radius: 999px; padding: 8px 16px; font-weight: bold; cursor: pointer;
+  background: #eee; color: #666; box-shadow: 0 3px 0 #ccc;
+}
+.world-tab.active { background: #6fbf73; color: #fff; box-shadow: 0 3px 0 #3f8a45; }
+.world-tab:disabled { opacity: .5; cursor: not-allowed; }
+
+.page-nav { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 8px 0; }
+.page-nav button {
+  border: none; border-radius: 999px; padding: 6px 14px; font-weight: bold; cursor: pointer;
+  background: #eee; box-shadow: 0 2px 0 #ccc;
+}
+.page-nav button:disabled { opacity: .4; cursor: not-allowed; }
+.page-nav span { font-size: .9em; color: #666; }
+
+#world-boss-row { text-align: center; margin: 6px 0; }
+.world-boss-btn {
+  border: none; border-radius: 14px; padding: 14px 20px; font-weight: bold; font-size: 1.15em; cursor: pointer;
+  background: #ffb3b3; box-shadow: 0 3px 0 #d95050; width: 100%; max-width: 420px;
+}
+.world-boss-btn.cleared { background: #ffe08a; box-shadow: 0 3px 0 #d9a12d; }
+.world-boss-btn:disabled { background: #ddd; color: #999; box-shadow: 0 3px 0 #b3b3b3; cursor: not-allowed; }
+
 /* ---------- Roster ---------- */
 #screen-roster { text-align: center; }
 .fruit-bar {

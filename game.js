@@ -163,32 +163,48 @@ const TIER_POOL = {
   3: ["wing", "energy"],
 };
 
+const STAGES_PER_WORLD = 300;
+const WORLD_COUNT = 3;
+
 const STAGES = (() => {
   const list = [];
   let gi = 0;
-  for (let chapter = 1; chapter <= 3; chapter++) {
-    for (let s = 1; s <= 3; s++) {
+  for (let world = 1; world <= WORLD_COUNT; world++) {
+    const pool = world === 1 ? [1] : world === 2 ? [1, 2] : [1, 2, 3];
+    for (let s = 1; s <= STAGES_PER_WORLD; s++) {
       gi++;
-      const pool = chapter === 1 ? [1] : chapter === 2 ? [1, 2] : [1, 2, 3];
       list.push({
-        id: `${chapter}-${s}`,
-        label: `${chapter}-${s}`,
-        chapter, stageNum: s, globalIndex: gi,
+        id: `${world}-${s}`,
+        label: `${world}-${s}`,
+        world, chapter: world, stageNum: s, globalIndex: gi,
         tierPool: pool,
-        enemyBaseMaxHp: 260 + gi * 110,
-        spawnInterval: Math.max(1150, 2600 - gi * 110),
-        catStatMul: 1 + (gi - 1) * 0.11,
-        moneyPerTick: 5 + gi * 0.55,
-        fruitReward: 2 + Math.floor(gi / 1.5),
+        enemyBaseMaxHp: 260 + gi * 18,
+        spawnInterval: Math.max(650, 2600 - gi * 2.2),
+        catStatMul: 1 + (gi - 1) * 0.0065,
+        moneyPerTick: 5 + gi * 0.05,
+        fruitReward: 2 + Math.floor(gi / 40),
         isBoss: false,
       });
     }
+    gi++;
+    // 각 세계의 300스테이지를 전부 깨야 도전할 수 있는 세계 보스전
+    list.push({
+      id: `${world}-boss`, label: `${world}세계 보스전`, world, chapter: world, stageNum: "boss", globalIndex: gi,
+      tierPool: pool, includeBoss: true, worldBoss: true,
+      enemyBaseMaxHp: (260 + gi * 18) * 3, spawnInterval: Math.max(650, 2600 - gi * 2.2) * 0.6,
+      catStatMul: (1 + (gi - 1) * 0.0065) * 1.8,
+      moneyPerTick: (5 + gi * 0.05) * 1.5, fruitReward: 20 + world * 15,
+      isBoss: true,
+    });
   }
+  gi++;
+  // 세 세계의 보스를 모두 잡아야 도전 가능한 최종 보스전 - 잡몹도 계속 소환하며 몰아붙인다
   list.push({
-    id: "boss", label: "최종 보스", chapter: 4, stageNum: 1, globalIndex: gi + 1,
-    tierPool: [1, 2, 3], includeBoss: true,
-    enemyBaseMaxHp: 3200, spawnInterval: 1600, catStatMul: 1.8,
-    moneyPerTick: 10, fruitReward: 15, isBoss: true,
+    id: "final-boss", label: "최종 보스전", world: WORLD_COUNT + 1, chapter: WORLD_COUNT + 1, stageNum: "final", globalIndex: gi,
+    tierPool: [1, 2, 3], includeBoss: true, finalBoss: true,
+    enemyBaseMaxHp: 9000, spawnInterval: 500, catStatMul: 8,
+    moneyPerTick: 20, fruitReward: 100,
+    isBoss: true,
   });
   return list;
 })();
@@ -300,19 +316,80 @@ function showScreen(id) {
 }
 
 /* ===================== 스테이지 선택 화면 ===================== */
+const WORLD_PAGE_SIZE = 30;
+let stageSelectWorld = 1;
+let stageSelectPage = 0;
+
 function renderStageGrid() {
+  renderWorldTabs();
   const grid = document.getElementById("stage-grid");
+  const bossRow = document.getElementById("world-boss-row");
+  const pageNav = document.getElementById("page-nav");
   grid.innerHTML = "";
-  STAGES.forEach(st => {
+  bossRow.innerHTML = "";
+  pageNav.innerHTML = "";
+
+  if (stageSelectWorld === WORLD_COUNT + 1) {
+    const finalBoss = STAGES.find(st => st.finalBoss);
+    renderBossButton(bossRow, finalBoss, "👑 최종 보스전");
+    return;
+  }
+
+  const worldStages = STAGES.filter(st => st.world === stageSelectWorld && !st.worldBoss && !st.finalBoss);
+  const totalPages = Math.ceil(worldStages.length / WORLD_PAGE_SIZE);
+  stageSelectPage = Math.max(0, Math.min(stageSelectPage, totalPages - 1));
+  const pageStages = worldStages.slice(stageSelectPage * WORLD_PAGE_SIZE, (stageSelectPage + 1) * WORLD_PAGE_SIZE);
+
+  pageStages.forEach(st => {
     const btn = document.createElement("button");
     const unlocked = st.globalIndex <= save.unlockedIndex;
     const cleared = st.globalIndex < save.unlockedIndex;
-    btn.className = "stage-btn" + (unlocked ? "" : " locked") + (cleared ? " cleared" : "") + (st.isBoss ? " boss" : "");
-    btn.textContent = st.isBoss ? "👑 최종 보스전" : st.label;
+    btn.className = "stage-btn" + (unlocked ? "" : " locked") + (cleared ? " cleared" : "");
+    btn.textContent = st.stageNum;
+    btn.title = st.label;
     btn.disabled = !unlocked;
     btn.addEventListener("click", () => { playSfx("click"); startStage(st); });
     grid.appendChild(btn);
   });
+
+  const prevBtn = document.createElement("button");
+  prevBtn.textContent = "◀ 이전";
+  prevBtn.disabled = stageSelectPage <= 0;
+  prevBtn.addEventListener("click", () => { stageSelectPage--; playSfx("click"); renderStageGrid(); });
+  const label = document.createElement("span");
+  label.textContent = `${stageSelectPage + 1} / ${totalPages} 페이지 (${stageSelectWorld}-${stageSelectPage * WORLD_PAGE_SIZE + 1}~${Math.min(worldStages.length, (stageSelectPage + 1) * WORLD_PAGE_SIZE)})`;
+  const nextBtn = document.createElement("button");
+  nextBtn.textContent = "다음 ▶";
+  nextBtn.disabled = stageSelectPage >= totalPages - 1;
+  nextBtn.addEventListener("click", () => { stageSelectPage++; playSfx("click"); renderStageGrid(); });
+  pageNav.append(prevBtn, label, nextBtn);
+
+  const worldBoss = STAGES.find(st => st.world === stageSelectWorld && st.worldBoss);
+  renderBossButton(bossRow, worldBoss, `👑 ${stageSelectWorld}세계 보스전`);
+}
+
+function renderBossButton(container, bossStage, label) {
+  const unlocked = bossStage.globalIndex <= save.unlockedIndex;
+  const cleared = bossStage.globalIndex < save.unlockedIndex;
+  const btn = document.createElement("button");
+  btn.className = "world-boss-btn" + (cleared ? " cleared" : "");
+  btn.textContent = unlocked ? label : `🔒 ${label} (스테이지를 모두 깨야 도전 가능)`;
+  btn.disabled = !unlocked;
+  btn.addEventListener("click", () => { playSfx("click"); startStage(bossStage); });
+  container.appendChild(btn);
+}
+
+function renderWorldTabs() {
+  const tabs = document.getElementById("world-tabs");
+  tabs.innerHTML = "";
+  const names = ["1세계", "2세계", "3세계", "최종보스"];
+  for (let w = 1; w <= WORLD_COUNT + 1; w++) {
+    const btn = document.createElement("button");
+    btn.className = "world-tab" + (w === stageSelectWorld ? " active" : "");
+    btn.textContent = names[w - 1];
+    btn.addEventListener("click", () => { stageSelectWorld = w; stageSelectPage = 0; playSfx("click"); renderStageGrid(); });
+    tabs.appendChild(btn);
+  }
 }
 
 /* ===================== 강화(로스터) 화면 ===================== */
@@ -433,7 +510,7 @@ function startStage(stageDef) {
   const autoBtn = document.getElementById("btn-autospawn");
   autoBtn.classList.remove("on");
   autoBtn.textContent = "🔁 자동 소환 OFF";
-  document.getElementById("stage-label").textContent = stageDef.isBoss ? "최종 보스전" : stageDef.label;
+  document.getElementById("stage-label").textContent = stageDef.finalBoss ? "최종 보스전" : stageDef.worldBoss ? `${stageDef.world}세계 보스전` : stageDef.label;
   renderUnitBar();
   showScreen("screen-battle");
   requestAnimationFrame(gameLoop);
@@ -442,7 +519,7 @@ function startStage(stageDef) {
 function pickCatId(stageDef) {
   const pool = [];
   stageDef.tierPool.forEach(tier => pool.push(...TIER_POOL[tier]));
-  if (stageDef.includeBoss && Math.random() < 0.12) return "boss";
+  if (stageDef.includeBoss && Math.random() < (stageDef.finalBoss ? 0.3 : stageDef.worldBoss ? 0.2 : 0.12)) return "boss";
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -708,10 +785,17 @@ function endStage(win) {
       gained.push(f.emoji);
     }
     persistSave();
-    document.getElementById("result-title").textContent = battle.stage.isBoss ? "🎉 게임 클리어! 🎉" : "승리!";
-    document.getElementById("result-desc").textContent = battle.stage.isBoss
-      ? "모든 스테이지를 클리어했습니다! 최고의 강아지 부대예요."
-      : `보상 열매: ${gained.join(" ")}`;
+    let title = "승리!";
+    let desc = `보상 열매: ${gained.join(" ")}`;
+    if (battle.stage.finalBoss) {
+      title = "🎉 게임 클리어! 🎉";
+      desc = "모든 세계와 최종 보스를 클리어했습니다! 최고의 강아지 부대예요.";
+    } else if (battle.stage.worldBoss) {
+      title = `👑 ${battle.stage.world}세계 클리어!`;
+      desc = `다음 세계로 나아가세요! 보상 열매: ${gained.join(" ")}`;
+    }
+    document.getElementById("result-title").textContent = title;
+    document.getElementById("result-desc").textContent = desc;
   } else {
     document.getElementById("result-title").textContent = "패배...";
     document.getElementById("result-desc").textContent = "부대를 강화하고 다시 도전해보세요.";
