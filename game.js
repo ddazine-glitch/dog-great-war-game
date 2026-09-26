@@ -918,6 +918,7 @@ function startStage(stageDef) {
     playerBaseMaxHp: playerBaseMaxHp,
     cooldowns: {},
     spawnTimer: 900,
+    cannonCooldown: 0,
     autoSpawn: false,
     bossWave: null,
     bossWaveTimer: 3000,
@@ -930,6 +931,7 @@ function startStage(stageDef) {
   ALLY_TYPES.forEach(t => { battle.cooldowns[t.id] = 0; });
   selectedUnit = null;
   resetItemButtons();
+  updateCannonUI();
   if (stageDef.finalBoss) {
     // 최종 보스전 시작과 함께 총을 든 사람 영웅을 얻고, 바로 조종할 수 있게 선택된다
     const hero = createHero();
@@ -967,6 +969,7 @@ function startPvpBattle(oppData) {
     cooldowns: {},
     oppCooldowns: {},
     spawnTimer: Infinity,
+    cannonCooldown: 0,
     autoSpawn: false,
     bossWave: null,
     bossWaveTimer: Infinity,
@@ -979,6 +982,7 @@ function startPvpBattle(oppData) {
   ALLY_TYPES.forEach(t => { battle.cooldowns[t.id] = 0; battle.oppCooldowns[t.id] = 0; });
   selectedUnit = null;
   resetItemButtons();
+  updateCannonUI();
   document.getElementById("control-hint").textContent = "⚔️ 코드 대전 중!";
   const autoBtn = document.getElementById("btn-autospawn");
   autoBtn.classList.remove("on");
@@ -1232,12 +1236,13 @@ function attackBase(attackerSide, dmg) {
 
 const CANNON_FLIGHT_SPEED = 1500; // px/sec, 포탄이 화면을 가로지르는 속도
 
+const CANNON_COOLDOWN = 3000; // 대포 재발사 쿨타임(ms)
 function fireCannon() {
-  // 쿨타임 없이 누르는 즉시 항상 최대 위력으로 발사된다
   const dmg = Math.round((220 + battle.stage.globalIndex * 32) * CANNON_DMG_MUL[save.cannonLevel]);
   battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, dmg, hit: false, trail: [], level: save.cannonLevel, hitIds: new Set() });
   spawnBurst(RIGHT_BASE_X - 30, LANE_Y - 6, "#5ec8e8");
   playSfx("cannon");
+  battle.cannonCooldown = CANNON_COOLDOWN;
 }
 function updateProjectiles(dt) {
   for (const p of battle.projectiles) {
@@ -1350,12 +1355,12 @@ document.getElementById("btn-autospawn").addEventListener("click", (e) => {
   playSfx("click");
 });
 document.getElementById("btn-cannon").addEventListener("click", () => {
-  if (!battle || battle.over) return;
-  fireCannon(); // 쿨타임 없이 누르는 즉시 발사
+  if (!battle || battle.over || battle.cannonCooldown > 0) return;
+  fireCannon();
 });
 const ITEM_DURATION = 12000; // 아이템 효과 지속시간(ms)
 function updateItemUI() {
-  const labels = { speed: "⚡ 2배속", atk: "💥 공격 2배", gold: "💰 골드 2배" };
+  const labels = { speed: "⚡ 1.5배속", atk: "💥 공격 1.5배", gold: "💰 골드 1.5배" };
   ["speed", "atk", "gold"].forEach(kind => {
     const btn = document.getElementById(`btn-item-${kind}`);
     if (battle.itemTimer[kind] > 0) {
@@ -1366,6 +1371,16 @@ function updateItemUI() {
       btn.textContent = `${labels[kind]} (사용함)`;
     }
   });
+}
+function updateCannonUI() {
+  const btn = document.getElementById("btn-cannon");
+  if (battle.cannonCooldown > 0) {
+    btn.disabled = true;
+    btn.textContent = `🐶💥 재장전중 (${Math.ceil(battle.cannonCooldown / 1000)}s)`;
+  } else {
+    btn.disabled = false;
+    btn.textContent = "🐶💥 대포 발사";
+  }
 }
 function resetItemButtons() {
   ["speed", "atk", "gold"].forEach(kind => {
@@ -1764,6 +1779,8 @@ function gameLoop(now) {
     document.getElementById("money-label").textContent = `💰 ${Math.floor(battle.money)}`;
     updateUnitBarUI();
     updateItemUI();
+    if (battle.cannonCooldown > 0) battle.cannonCooldown = Math.max(0, battle.cannonCooldown - dt);
+    updateCannonUI();
   }
 
   render();
