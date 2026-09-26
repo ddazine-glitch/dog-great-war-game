@@ -29,8 +29,26 @@
     <div class="row-buttons">
       <button id="btn-open-roster" class="mid-btn">🍎 강아지 부대 강화</button>
       <button id="btn-open-gacha" class="mid-btn">🎴 카드 뽑기</button>
+      <button id="btn-open-pvp" class="mid-btn">⚔️ 코드 대전</button>
       <button id="btn-back-title" class="mid-btn ghost">처음으로</button>
     </div>
+  </section>
+
+  <section id="screen-pvp" class="screen">
+    <h2>⚔️ 코드 대전</h2>
+    <p class="subtitle">서버 없이, 코드를 주고받아서 내 부대 vs 상대 부대로 대결해요</p>
+    <div class="pvp-box">
+      <div class="name">1. 내 코드 (친구에게 보내주세요)</div>
+      <textarea id="pvp-my-code" class="pvp-code" readonly rows="3"></textarea>
+      <button id="btn-pvp-copy" class="mid-btn">📋 복사하기</button>
+    </div>
+    <div class="pvp-box">
+      <div class="name">2. 상대 코드 입력하고 대결 시작</div>
+      <textarea id="pvp-opp-code" class="pvp-code" rows="3" placeholder="상대가 보내준 코드를 여기에 붙여넣기"></textarea>
+      <button id="btn-pvp-fight" class="big-btn">⚔️ 대결 시작!</button>
+      <p id="pvp-error" class="pvp-error"></p>
+    </div>
+    <button id="btn-pvp-back" class="mid-btn">뒤로</button>
   </section>
 
   <section id="screen-gacha" class="screen">

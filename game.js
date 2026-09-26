@@ -495,6 +495,20 @@ function renderBaseCannonUpgrades() {
   });
 }
 
+/* ===================== 코드 대전 (서버 없는 async PvP) ===================== */
+function exportPvpCode() {
+  const stages = {};
+  ALLY_TYPES.forEach(t => { stages[t.id] = save.allies[t.id].stage; });
+  const data = { o: save.ownedAllies, s: stages, b: save.baseLevel };
+  return btoa(encodeURIComponent(JSON.stringify(data)));
+}
+function importPvpCode(code) {
+  try {
+    const data = JSON.parse(decodeURIComponent(atob(code.trim())));
+    if (!Array.isArray(data.o) || typeof data.s !== "object") return null;
+    return data;
+  } catch (e) { return null; }
+}
 function renderGacha() {
   document.getElementById("gacha-card-count").textContent = `🎴 보유 카드: ${save.cards}개`;
   document.getElementById("btn-gacha-pull").disabled = save.cards < GACHA_COST;
@@ -655,6 +669,66 @@ function startStage(stageDef) {
   requestAnimationFrame(gameLoop);
 }
 
+function startPvpBattle(oppData) {
+  const myBaseMaxHp = Math.round(PLAYER_BASE_MAX_HP * BASE_HP_MUL[save.baseLevel]);
+  const oppBaseMaxHp = Math.round(PLAYER_BASE_MAX_HP * BASE_HP_MUL[oppData.b || 1]);
+  battle = {
+    stage: { pvp: true, globalIndex: save.unlockedIndex, fruitReward: 0, moneyPerTick: 6, isBoss: false, worldBoss: false, finalBoss: false, label: "코드 대전" },
+    units: [],
+    effects: [],
+    projectiles: [],
+    money: 150,
+    oppMoney: 150,
+    oppData,
+    enemyBaseHp: oppBaseMaxHp,
+    enemyBaseMaxHp: oppBaseMaxHp,
+    playerBaseHp: myBaseMaxHp,
+    playerBaseMaxHp: myBaseMaxHp,
+    cooldowns: {},
+    oppCooldowns: {},
+    spawnTimer: Infinity,
+    cannonCharge: 0,
+    cannonMax: 5000 * CANNON_CHARGE_MUL[save.cannonLevel],
+    autoSpawn: false,
+    bossWave: null,
+    bossWaveTimer: Infinity,
+    over: false,
+    lastTime: performance.now(),
+  };
+  ALLY_TYPES.forEach(t => { battle.cooldowns[t.id] = 0; battle.oppCooldowns[t.id] = 0; });
+  selectedUnit = null;
+  document.getElementById("control-hint").textContent = "⚔️ 코드 대전 중!";
+  const autoBtn = document.getElementById("btn-autospawn");
+  autoBtn.classList.remove("on");
+  autoBtn.textContent = "🔁 자동 소환 OFF";
+  document.getElementById("stage-label").textContent = "⚔️ 코드 대전";
+  renderUnitBar();
+  showScreen("screen-battle");
+  requestAnimationFrame(gameLoop);
+}
+function opponentAutoSpawnTick() {
+  for (const id of battle.oppData.o) {
+    const base = ALLY_TYPES.find(t => t.id === id);
+    if (!base) continue;
+    if (battle.oppCooldowns[id] > 0 || battle.oppMoney < base.cost) continue;
+    battle.oppMoney -= base.cost;
+    battle.oppCooldowns[id] = base.cooldown;
+    const stage = battle.oppData.s[id] || 1;
+    const u = new Unit("enemy", ENEMY_SPAWN_X);
+    u.typeId = id;
+    u.oppAlly = true;
+    u.stage = stage;
+    u.maxHp = Math.round(base.hp * (STAGE_HP_MUL[stage] || 1));
+    u.hp = u.maxHp;
+    u.atk = Math.round(base.atk * (STAGE_ATK_MUL[stage] || 1));
+    u.range = base.range;
+    u.speed = base.speed;
+    u.atkInterval = base.atkInterval;
+    battle.units.push(u);
+    spawnImpact(ENEMY_SPAWN_X, LANE_Y - 10, "#ff8a8a");
+  }
+}
+
 function pickCatId(stageDef) {
   const pool = [];
   stageDef.tierPool.forEach(tier => pool.push(...TIER_POOL[tier]));
@@ -754,7 +828,7 @@ function dealDamageToUnit(target, dmg) {
 }
 
 function onUnitDeath(unit) {
-  if (unit.side === "enemy") {
+  if (unit.side === "enemy" && !unit.oppAlly) {
     const isGold = unit.catId === "gold";
     const reward = Math.round((6 + unit.tier * 4) * (isGold ? 5 : 1));
     battle.money += reward;
@@ -770,6 +844,10 @@ function onUnitDeath(unit) {
     if (isGold) {
       spawnFloatText(unit.x, unit.y - 82, "💰 황금 고양이!", "#e0a800");
     }
+  } else if (unit.oppAlly) {
+    const reward = 8 + (unit.stage || 1) * 3;
+    battle.money += reward;
+    spawnFlyReward(unit.x, unit.y - 30, `+${reward}💰`, "#b8860b");
   }
 }
 
@@ -984,6 +1062,14 @@ function endStage(win) {
   if (battle.over) return;
   battle.over = true;
   playSfx(win ? "win" : "lose");
+  if (battle.stage.pvp) {
+    document.getElementById("result-title").textContent = win ? "⚔️ 대전 승리!" : "⚔️ 대전 패배...";
+    document.getElementById("result-desc").textContent = win
+      ? "내 부대가 상대 부대를 이겼어요!"
+      : "상대 부대가 더 강했어요. 부대를 더 키워서 다시 도전해보세요.";
+    document.getElementById("result-overlay").classList.remove("hidden");
+    return;
+  }
   if (win) {
     if (battle.stage.globalIndex >= save.unlockedIndex) {
       save.unlockedIndex = battle.stage.globalIndex + 1;
@@ -1153,9 +1239,11 @@ function drawUnit(u) {
 
   ctx.font = "30px sans-serif";
   ctx.textAlign = "center";
-  if (u.side === "ally" && EVOLUTION_FORMS[u.typeId]) {
+  if ((u.side === "ally" || u.oppAlly) && EVOLUTION_FORMS[u.typeId]) {
     const form = EVOLUTION_FORMS[u.typeId][(u.stage || 1) - 1];
+    if (u.oppAlly) ctx.filter = "hue-rotate(150deg) saturate(1.6)"; // 상대팀 부대는 색을 다르게 해서 구분한다
     ctx.fillText(form.emoji, 0, 0);
+    ctx.filter = "none";
     for (const acc of form.accessories) {
       ctx.save();
       ctx.font = `${30 * acc.scale}px sans-serif`;
@@ -1297,18 +1385,26 @@ function gameLoop(now) {
       if (battle.cooldowns[t.id] > 0) battle.cooldowns[t.id] = Math.max(0, battle.cooldowns[t.id] - dt);
     });
 
-    battle.spawnTimer -= dt;
-    if (battle.spawnTimer <= 0) {
-      const enemyCount = battle.units.reduce((n, u) => n + (u.side === "enemy" && !u.dead ? 1 : 0), 0);
-      if (enemyCount < MAX_ENEMIES_ON_FIELD) {
-        const catId = pickCatId(battle.stage);
-        battle.units.push(createEnemy(catId, battle.stage.catStatMul));
-        spawnImpact(ENEMY_SPAWN_X, LANE_Y - 10, "#ff8a8a");
-        playSfx("spawnEnemy");
-        battle.spawnTimer = battle.stage.spawnInterval;
-      } else {
-        // 화면에 적이 너무 많이 쌓이지 않도록 상한을 두고, 여유가 생기면 곧바로 다시 시도한다
-        battle.spawnTimer = 400;
+    if (battle.stage.pvp) {
+      battle.oppMoney += 6 * (dt / 1000);
+      ALLY_TYPES.forEach(t => {
+        if (battle.oppCooldowns[t.id] > 0) battle.oppCooldowns[t.id] = Math.max(0, battle.oppCooldowns[t.id] - dt);
+      });
+      opponentAutoSpawnTick();
+    } else {
+      battle.spawnTimer -= dt;
+      if (battle.spawnTimer <= 0) {
+        const enemyCount = battle.units.reduce((n, u) => n + (u.side === "enemy" && !u.dead ? 1 : 0), 0);
+        if (enemyCount < MAX_ENEMIES_ON_FIELD) {
+          const catId = pickCatId(battle.stage);
+          battle.units.push(createEnemy(catId, battle.stage.catStatMul));
+          spawnImpact(ENEMY_SPAWN_X, LANE_Y - 10, "#ff8a8a");
+          playSfx("spawnEnemy");
+          battle.spawnTimer = battle.stage.spawnInterval;
+        } else {
+          // 화면에 적이 너무 많이 쌓이지 않도록 상한을 두고, 여유가 생기면 곧바로 다시 시도한다
+          battle.spawnTimer = 400;
+        }
       }
     }
 
@@ -1353,6 +1449,43 @@ document.getElementById("btn-open-gacha").addEventListener("click", () => {
   playSfx("click");
   renderGacha();
   showScreen("screen-gacha");
+});
+document.getElementById("btn-open-pvp").addEventListener("click", () => {
+  playSfx("click");
+  document.getElementById("pvp-my-code").value = exportPvpCode();
+  document.getElementById("pvp-error").textContent = "";
+  showScreen("screen-pvp");
+});
+document.getElementById("btn-pvp-back").addEventListener("click", () => {
+  playSfx("click");
+  renderStageGrid();
+  showScreen("screen-stageselect");
+});
+document.getElementById("btn-pvp-copy").addEventListener("click", async () => {
+  const code = document.getElementById("pvp-my-code").value;
+  try {
+    await navigator.clipboard.writeText(code);
+    playSfx("feed");
+    document.getElementById("pvp-error").style.color = "#3f8ce0";
+    document.getElementById("pvp-error").textContent = "복사됐어요!";
+  } catch (e) {
+    document.getElementById("pvp-my-code").select();
+    document.getElementById("pvp-error").textContent = "복사 실패 - 직접 선택해서 복사해주세요";
+  }
+});
+document.getElementById("btn-pvp-fight").addEventListener("click", () => {
+  const raw = document.getElementById("pvp-opp-code").value;
+  const oppData = importPvpCode(raw);
+  const errEl = document.getElementById("pvp-error");
+  if (!oppData) {
+    errEl.style.color = "#d33";
+    errEl.textContent = "코드가 올바르지 않아요. 다시 확인해주세요.";
+    playSfx("noMoney");
+    return;
+  }
+  errEl.textContent = "";
+  playSfx("click");
+  startPvpBattle(oppData);
 });
 document.getElementById("btn-gacha-back").addEventListener("click", () => {
   playSfx("click");

@@ -134,6 +134,20 @@ button {
 .world-boss-btn.cleared { background: #ffe08a; box-shadow: 0 3px 0 #d9a12d; }
 .world-boss-btn:disabled { background: #ddd; color: #999; box-shadow: 0 3px 0 #b3b3b3; cursor: not-allowed; }
 
+/* ---------- PvP ---------- */
+#screen-pvp { text-align: center; }
+.pvp-box {
+  background: #fff; border-radius: 14px; padding: 14px; margin: 12px auto;
+  max-width: 460px; box-shadow: 0 3px 0 #ddd;
+}
+.pvp-box .name { font-weight: bold; margin-bottom: 8px; }
+.pvp-code {
+  width: 100%; font-size: .78em; font-family: monospace; padding: 8px;
+  border: 1px solid #ddd; border-radius: 8px; resize: none; box-sizing: border-box;
+  margin-bottom: 8px;
+}
+.pvp-error { color: #d33; font-size: .85em; min-height: 1.2em; }
+
 /* ---------- Gacha ---------- */
 #screen-gacha { text-align: center; }
 #gacha-card-count { font-weight: bold; color: #b8860b; }
