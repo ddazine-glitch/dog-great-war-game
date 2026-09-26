@@ -9,6 +9,25 @@ const PLAYER_BASE_MAX_HP = 500;
 const MAX_ENEMIES_ON_FIELD = 20; // 화면에 적이 한꺼번에 몰려 겹치지 않도록 동시 등장 상한
 const SAVE_KEY = "doggreatwar_save_v1";
 
+// 특성 시스템: 적에게는 "속성", 아군은 6단계까지 강화하면 특정 속성에 강해지고(대신 다른 속성엔 약해짐)
+const TRAITS = {
+  alien: { label: "에일리언", emoji: "👽" },
+  black: { label: "블랙",     emoji: "⚫" },
+  angel: { label: "천사",     emoji: "👼" },
+  metal: { label: "메탈",     emoji: "🤖" },
+  ghost: { label: "유령",     emoji: "👻" },
+};
+const TRAIT_KEYS = Object.keys(TRAITS);
+const TRAIT_UNLOCK_STAGE = 6; // 이 단계까지 강화해야 특성이 "묻어서" 발동한다
+const TRAIT_STRONG_MUL = 1.5;
+const TRAIT_WEAK_MUL = 0.7; // 약점 상대에게 주는 피해
+const TRAIT_TAKEN_WEAK_MUL = 1.3; // 약점 상대에게 받는 피해
+function getAllyTraitInfo(typeId) {
+  const idx = ALLY_TYPES.findIndex(t => t.id === typeId);
+  if (idx < 0) return null;
+  return { strong: TRAIT_KEYS[idx % TRAIT_KEYS.length], weak: TRAIT_KEYS[(idx + 2) % TRAIT_KEYS.length] };
+}
+
 const STAGE_MAX = 6;
 const STAGE_HP_MUL = { 1: 1, 2: 1.5, 3: 2.1, 4: 2.8, 5: 3.6, 6: 4.6 };
 const STAGE_ATK_MUL = { 1: 1, 2: 1.4, 3: 1.9, 4: 2.5, 5: 3.2, 6: 4.0 };
@@ -281,15 +300,15 @@ const FRUITS = [
 const CAT_DEFS = {
   white:  { name: "흰 고양이",   emoji: "🐱", tier: 1, hp: 65,  atk: 9,  speed: 24, range: 30, atkInterval: 1000 },
   gray:   { name: "회색 고양이", emoji: "🐈", tier: 1, hp: 70,  atk: 9,  speed: 24, range: 30, atkInterval: 1000 },
-  black:  { name: "검은 고양이", emoji: "🐈‍⬛", tier: 1, hp: 75,  atk: 11, speed: 23, range: 30, atkInterval: 1000 },
-  armor:  { name: "갑옷 고양이", emoji: "🐱", badge: "🛡️", tier: 2, hp: 150, atk: 15, speed: 20, range: 32, atkInterval: 1000 },
+  black:  { name: "검은 고양이", emoji: "🐈‍⬛", tier: 1, hp: 75,  atk: 11, speed: 23, range: 30, atkInterval: 1000, trait: "black" },
+  armor:  { name: "갑옷 고양이", emoji: "🐱", badge: "🛡️", tier: 2, hp: 150, atk: 15, speed: 20, range: 32, atkInterval: 1000, trait: "metal" },
   horn:   { name: "뿔 고양이",   emoji: "🐱", badge: "😈", tier: 2, hp: 140, atk: 19, speed: 22, range: 32, atkInterval: 950 },
-  wing:   { name: "날개 고양이", emoji: "🐱", badge: "🦋", tier: 3, hp: 220, atk: 26, speed: 26, range: 34, atkInterval: 900 },
-  energy: { name: "에너지 고양이", emoji: "🐱", badge: "⚡", tier: 3, hp: 230, atk: 29, speed: 24, range: 36, atkInterval: 850 },
-  boss:   { name: "보스 고양이", emoji: "🐯", badge: "👑", tier: 4, hp: 3200, atk: 48, speed: 14, range: 44, atkInterval: 850 },
+  wing:   { name: "날개 고양이", emoji: "🐱", badge: "🦋", tier: 3, hp: 220, atk: 26, speed: 26, range: 34, atkInterval: 900, trait: "angel" },
+  energy: { name: "에너지 고양이", emoji: "🐱", badge: "⚡", tier: 3, hp: 230, atk: 29, speed: 24, range: 36, atkInterval: 850, trait: "alien" },
+  boss:   { name: "보스 고양이", emoji: "🐯", badge: "👑", tier: 4, hp: 3200, atk: 48, speed: 14, range: 44, atkInterval: 850, trait: "alien" },
   ninja:  { name: "닌자 고양이", emoji: "🐱", badge: "🥷", tier: 2, hp: 130, atk: 22, speed: 30, range: 30, atkInterval: 800 },
-  ice:    { name: "얼음 고양이", emoji: "🐱", badge: "❄️", tier: 3, hp: 240, atk: 23, speed: 20, range: 36, atkInterval: 900 },
-  ghost:  { name: "유령 고양이", emoji: "👻", tier: 3, hp: 210, atk: 28, speed: 34, range: 34, atkInterval: 800 },
+  ice:    { name: "얼음 고양이", emoji: "🐱", badge: "❄️", tier: 3, hp: 240, atk: 23, speed: 20, range: 36, atkInterval: 900, trait: "metal" },
+  ghost:  { name: "유령 고양이", emoji: "👻", tier: 3, hp: 210, atk: 28, speed: 34, range: 34, atkInterval: 800, trait: "ghost" },
   gold:   { name: "황금 고양이", emoji: "🐱", badge: "💰", tier: 0, hp: 70, atk: 4, speed: 26, range: 28, atkInterval: 1200, special: "gold" },
 };
 const TIER_POOL = {
@@ -672,6 +691,24 @@ function importPvpCode(code) {
     return { o, s, b };
   } catch (e) { return null; }
 }
+function renderTraits() {
+  const box = document.getElementById("trait-list");
+  box.innerHTML = "";
+  TRAIT_KEYS.forEach(key => {
+    const t = TRAITS[key];
+    const strongOwned = ALLY_TYPES.filter(a => getAllyTraitInfo(a.id).strong === key && save.ownedAllies.includes(a.id)).map(a => a.name);
+    const enemiesWithTrait = Object.values(CAT_DEFS).filter(c => c.trait === key).map(c => c.name);
+    const card = document.createElement("div");
+    card.className = "trait-card";
+    card.innerHTML = `
+      <div class="t-emoji">${t.emoji}</div>
+      <div class="t-name">${t.label}</div>
+      <div class="t-strong-list">이 속성 적: ${enemiesWithTrait.join(", ") || "없음"}</div>
+      <div class="t-strong-list">내 캐릭터 중 이 속성에 강함: ${strongOwned.join(", ") || "(보유한 캐릭터 없음)"}</div>
+    `;
+    box.appendChild(card);
+  });
+}
 function renderGacha() {
   document.getElementById("gacha-card-count").textContent = `🎴 보유 카드: ${save.cards}개`;
   document.getElementById("btn-gacha-pull").textContent = `뽑기 (카드 ${GACHA_COST}개)`;
@@ -702,11 +739,17 @@ function renderRoster() {
     const pct = atMax ? 100 : Math.min(100, Math.round((prog.feeds / STAGE_UP_THRESHOLDS[prog.stage + 1]) * 100));
     const form = EVOLUTION_FORMS[type.id][prog.stage - 1];
     const badges = form.accessories.map(a => `<span class="badge">${a.emoji}</span>`).join("");
+    const traitInfo = getAllyTraitInfo(type.id);
+    const traitActive = prog.stage >= TRAIT_UNLOCK_STAGE;
+    const traitText = traitInfo
+      ? `${TRAITS[traitInfo.strong].emoji}${TRAITS[traitInfo.strong].label}에 강함 / ${TRAITS[traitInfo.weak].emoji}${TRAITS[traitInfo.weak].label}에 약함${traitActive ? "" : ` (6단계에 발동)`}`
+      : "";
     card.innerHTML = `
       <div class="avatar stage-${prog.stage}">${form.emoji}<span class="badges">${badges}</span></div>
       <div class="name">${type.name}</div>
       <div class="stage-tag">${prog.stage}/${STAGE_MAX}단계${atMax ? " (최대)" : ""}</div>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="trait-row">${traitText}</div>
       <div class="feed-row"></div>
     `;
     const row = card.querySelector(".feed-row");
@@ -783,6 +826,7 @@ function createEnemy(catId, mul) {
   u.badge = def.badge || "";
   u.name = def.name;
   u.tier = def.tier;
+  u.trait = def.trait || null;
   u.maxHp = Math.round(def.hp * mul);
   u.hp = u.maxHp;
   u.atk = Math.round(def.atk * mul);
@@ -1050,7 +1094,19 @@ function updateUnit(u, dt) {
       if (u.atkTimer <= 0) {
         // "공격력 2배" 아이템은 아군(오프얼라이 상대팀 제외)에게만 적용된다
         const atkMul = (u.side === "ally" && !u.oppAlly && battle.itemTimer.atk > 0) ? 2 : 1;
-        const dmg = Math.round(u.atk * atkMul);
+        // 6단계까지 강화하면 특성이 붙어서 특정 속성 상대에게는 강하고, 다른 속성 상대에게는 약해진다
+        let traitMul = 1;
+        if (u.side === "ally" && !u.oppAlly && u.stage >= TRAIT_UNLOCK_STAGE && found.target.trait) {
+          const info = getAllyTraitInfo(u.typeId);
+          if (info) {
+            if (info.strong === found.target.trait) traitMul *= TRAIT_STRONG_MUL;
+            else if (info.weak === found.target.trait) traitMul *= TRAIT_WEAK_MUL;
+          }
+        } else if (u.side === "enemy" && u.trait && found.target.side === "ally" && !found.target.oppAlly && found.target.stage >= TRAIT_UNLOCK_STAGE) {
+          const info = getAllyTraitInfo(found.target.typeId);
+          if (info && info.weak === u.trait) traitMul *= TRAIT_TAKEN_WEAK_MUL;
+        }
+        const dmg = Math.round(u.atk * atkMul * traitMul);
         dealDamageToUnit(found.target, dmg);
         if (u.aoe) {
           // 너구리처럼 광역 공격형 유닛은 주 타겟 옆의 다른 적에게도 약한 스플래시 피해를 준다
@@ -1675,6 +1731,16 @@ document.getElementById("btn-open-pvp").addEventListener("click", () => {
   document.getElementById("pvp-my-code").value = exportPvpCode();
   document.getElementById("pvp-error").textContent = "";
   showScreen("screen-pvp");
+});
+document.getElementById("btn-open-traits").addEventListener("click", () => {
+  playSfx("click");
+  renderTraits();
+  showScreen("screen-traits");
+});
+document.getElementById("btn-traits-back").addEventListener("click", () => {
+  playSfx("click");
+  renderStageGrid();
+  showScreen("screen-stageselect");
 });
 document.getElementById("btn-pvp-back").addEventListener("click", () => {
   playSfx("click");

@@ -136,6 +136,22 @@ button {
 .world-boss-btn.cleared { background: #ffe08a; box-shadow: 0 3px 0 #d9a12d; }
 .world-boss-btn:disabled { background: #ddd; color: #999; box-shadow: 0 3px 0 #b3b3b3; cursor: not-allowed; }
 
+/* ---------- Traits ---------- */
+#screen-traits { text-align: center; }
+.trait-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.trait-card {
+  background: #fff; border-radius: 14px; padding: 14px; box-shadow: 0 3px 0 #ddd;
+}
+.trait-card .t-emoji { font-size: 2em; }
+.trait-card .t-name { font-weight: bold; margin: 4px 0; }
+.trait-card .t-strong-list { font-size: .78em; color: #777; }
+.roster-card .trait-row { font-size: .75em; color: #666; margin-top: 4px; }
+
 /* ---------- PvP ---------- */
 #screen-pvp { text-align: center; }
 .pvp-box {
