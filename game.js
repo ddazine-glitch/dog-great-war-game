@@ -34,12 +34,11 @@ const STAGE_MAX = 6;
 const STAGE_HP_MUL = { 1: 1, 2: 1.25, 3: 1.55, 4: 1.85, 5: 2.15, 6: 2.5 };
 const STAGE_ATK_MUL = { 1: 1, 2: 1.2, 3: 1.45, 4: 1.7, 5: 1.95, 6: 2.2 };
 // 다음 단계로 올라가는 데 필요한 "누적" 열매 급여 횟수 (단계별) - 진화를 더 어렵게
-const STAGE_UP_THRESHOLDS = { 2: 5, 3: 11, 4: 19, 5: 29, 6: 40 };
+const FEEDS_PER_STAGE = 3; // 열매를 3번 먹이면 1단계 강화 (단계마다 다시 3번)
 
-// 기지/대포도 캐릭터처럼 열매로 3단계까지 강화 - 단계마다 모습도 함께 바뀐다
+// 기지/대포도 캐릭터처럼 열매로 3단계까지 강화 - 단계마다 모습도 함께 바뀐다 (강화 1번 = 1단계 상승)
 const UPGRADE_MAX = 3;
-const UPGRADE_STEPS_PER_LEVEL = 3; // 강화를 3번 해야 다음 단계로 넘어간다
-const UPGRADE_STEP_COST = 2; // 강화 1번에 필요한 열매 수
+const UPGRADE_COST = { 2: 5, 3: 5 };
 const BASE_HP_MUL = { 1: 1, 2: 1.6, 3: 2.4 };
 const CANNON_DMG_MUL = { 1: 0.4, 2: 0.7, 3: 1.0 };
 const CANNON_CHARGE_MUL = { 1: 1, 2: 0.85, 3: 0.7 };
@@ -384,7 +383,6 @@ function defaultSave() {
     enemyOwnedAllies: [],
     enemyAllyStages: {},
     pullsSinceEnemyGacha: 0,
-    upgradeProgress: { base: 0, cannon: 0 },
   };
 }
 const GACHA_COST = 1;
@@ -476,16 +474,10 @@ function spendFruits(n) {
 function upgradeBaseOrCannon(kind) {
   const levelKey = kind === "base" ? "baseLevel" : "cannonLevel";
   if (save[levelKey] >= UPGRADE_MAX) return false;
-  if (!spendFruits(UPGRADE_STEP_COST)) return false;
-  if (!save.upgradeProgress) save.upgradeProgress = { base: 0, cannon: 0 };
-  save.upgradeProgress[kind] = (save.upgradeProgress[kind] || 0) + 1;
-  let leveledUp = false;
-  if (save.upgradeProgress[kind] >= UPGRADE_STEPS_PER_LEVEL) {
-    save[levelKey]++;
-    save.upgradeProgress[kind] = 0;
-    leveledUp = true;
-  }
-  playSfx(leveledUp ? "evolve" : "feed");
+  const cost = UPGRADE_COST[save[levelKey] + 1];
+  if (!spendFruits(cost)) return false;
+  save[levelKey]++;
+  playSfx("evolve");
   persistSave();
   return true;
 }
@@ -527,8 +519,9 @@ function feedFruit(typeId, fruitId) {
   else if (fruitId === "purple") prog.bonus.range += 1.5;
   prog.feeds++;
   let leveledUp = false;
-  while (prog.stage < STAGE_MAX && prog.feeds >= STAGE_UP_THRESHOLDS[prog.stage + 1]) {
+  if (prog.stage < STAGE_MAX && prog.feeds >= FEEDS_PER_STAGE) {
     prog.stage++;
+    prog.feeds = 0;
     leveledUp = true;
   }
   playSfx(leveledUp ? "evolve" : "feed");
@@ -683,21 +676,18 @@ function renderBaseCannonUpgrades() {
   defs.forEach(def => {
     const level = save[def.kind === "base" ? "baseLevel" : "cannonLevel"];
     const atMax = level >= UPGRADE_MAX;
-    const progress = (save.upgradeProgress && save.upgradeProgress[def.kind]) || 0;
-    const pct = atMax ? 100 : Math.round((progress / UPGRADE_STEPS_PER_LEVEL) * 100);
+    const cost = atMax ? 0 : UPGRADE_COST[level + 1];
     const card = document.createElement("div");
     card.className = "roster-card upgrade-card";
     card.innerHTML = `
       <div class="name">${def.label}</div>
       <div class="stage-tag">${level}/${UPGRADE_MAX}단계 - ${def.visuals[level - 1]}${atMax ? " (최대)" : ""}</div>
       <div class="upgrade-desc">${def.desc}</div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-      ${atMax ? "" : `<div class="upgrade-desc">강화 ${progress}/${UPGRADE_STEPS_PER_LEVEL}번 (3번 하면 다음 단계)</div>`}
     `;
     const btn = document.createElement("button");
     btn.className = "mid-btn";
-    btn.textContent = atMax ? "최대 강화 완료" : `🍎 열매 ${UPGRADE_STEP_COST}개로 강화하기`;
-    btn.disabled = atMax || totalFruits() < UPGRADE_STEP_COST;
+    btn.textContent = atMax ? "최대 강화 완료" : `🍎 열매 ${cost}개로 강화`;
+    btn.disabled = atMax || totalFruits() < cost;
     btn.addEventListener("click", () => {
       if (upgradeBaseOrCannon(def.kind)) renderRoster();
     });
@@ -775,7 +765,7 @@ function renderRoster() {
     const card = document.createElement("div");
     card.className = "roster-card";
     const atMax = prog.stage >= STAGE_MAX;
-    const pct = atMax ? 100 : Math.min(100, Math.round((prog.feeds / STAGE_UP_THRESHOLDS[prog.stage + 1]) * 100));
+    const pct = atMax ? 100 : Math.min(100, Math.round((prog.feeds / FEEDS_PER_STAGE) * 100));
     const form = EVOLUTION_FORMS[type.id][prog.stage - 1];
     const badges = form.accessories.map(a => `<span class="badge">${a.emoji}</span>`).join("");
     const traitInfo = getAllyTraitInfo(type.id);
