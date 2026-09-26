@@ -1009,10 +1009,11 @@ function opponentAutoSpawnTick() {
   }
 }
 
-function pickCatId(stageDef) {
+function pickCatId(stageDef, bossAlreadyOnField) {
   const pool = [];
   stageDef.tierPool.forEach(tier => pool.push(...TIER_POOL[tier]));
-  if (stageDef.includeBoss && Math.random() < (stageDef.finalBoss ? 0.3 : stageDef.worldBoss ? 0.2 : stageDef.miniBoss ? 0.16 : 0.12)) return "boss";
+  // 보스는 화면에 한 번에 한 마리만 - 이미 보스가 살아있으면 새로 안 나온다
+  if (stageDef.includeBoss && !bossAlreadyOnField && Math.random() < (stageDef.finalBoss ? 0.3 : stageDef.worldBoss ? 0.2 : stageDef.miniBoss ? 0.16 : 0.12)) return "boss";
   if (Math.random() < GOLD_CAT_CHANCE) return "gold";
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -1746,7 +1747,8 @@ function gameLoop(now) {
           if (enemyAllyUnit) {
             battle.units.push(enemyAllyUnit);
           } else {
-            const catId = pickCatId(battle.stage);
+            const bossAlive = battle.units.some(u => u.side === "enemy" && u.catId === "boss" && !u.dead);
+            const catId = pickCatId(battle.stage, bossAlive);
             battle.units.push(createEnemy(catId, battle.stage.catStatMul));
           }
           spawnImpact(ENEMY_SPAWN_X, LANE_Y - 10, "#ff8a8a");
