@@ -198,6 +198,78 @@ Object.assign(EVOLUTION_FORMS, {
   shark:     makeEvolutionForms("🦈", null, "🩸"),
 });
 
+// 캐릭터를 100종 근처까지 크게 늘린다 - 역할 템플릿으로 스탯을 굴리고, 진화 실루엣은 자동 생성한다
+const ALLY_ROLE_TEMPLATES = {
+  swarm:    { costMul: 0.5, cdMul: 0.55, hpMul: 0.5,  atkMul: 0.55, rangeMul: 0.95, atkIntMul: 0.85, speedMul: 1.35 },
+  balanced: { costMul: 1.0, cdMul: 1.0,  hpMul: 1.0,  atkMul: 1.0,  rangeMul: 1.0,  atkIntMul: 1.0,  speedMul: 1.0 },
+  tank:     { costMul: 1.5, cdMul: 1.5,  hpMul: 2.4,  atkMul: 0.85, rangeMul: 0.95, atkIntMul: 1.25, speedMul: 0.6 },
+  ranged:   { costMul: 1.3, cdMul: 1.35, hpMul: 0.65, atkMul: 1.15, rangeMul: 1.9,  atkIntMul: 1.05, speedMul: 0.85 },
+  heavy:    { costMul: 2.1, cdMul: 2.3,  hpMul: 1.7,  atkMul: 2.0,  rangeMul: 1.05, atkIntMul: 1.3,  speedMul: 0.55 },
+};
+const ALLY_BASE_STATS = { cost: 55, cooldown: 2200, hp: 100, atk: 14, range: 34, atkInterval: 950, speed: 40 };
+function rollAllyStats(role, variance) {
+  const t = ALLY_ROLE_TEMPLATES[role];
+  const v = 1 + variance;
+  return {
+    cost: Math.round(ALLY_BASE_STATS.cost * t.costMul * v),
+    cooldown: Math.round(ALLY_BASE_STATS.cooldown * t.cdMul * v),
+    hp: Math.round(ALLY_BASE_STATS.hp * t.hpMul * v),
+    atk: Math.round(ALLY_BASE_STATS.atk * t.atkMul * v),
+    range: Math.round(ALLY_BASE_STATS.range * t.rangeMul),
+    atkInterval: Math.round(ALLY_BASE_STATS.atkInterval * t.atkIntMul),
+    speed: Math.round(ALLY_BASE_STATS.speed * t.speedMul * v),
+  };
+}
+const ACC_PALETTE = ["🛡️", "⚔️", "🔥", "✨", "👑", "💪", "🌙", "⚡", "🪨", "💥", "🗡️", "💨", "❄️", "🩸", "🏹", "🕊️", "💎", "🎋"];
+const NEW_CREATURES = [
+  { id: "rabbit", name: "토끼", emoji: "🐰" }, { id: "hamster", name: "햄스터", emoji: "🐹" },
+  { id: "mouse", name: "쥐", emoji: "🐭" }, { id: "rat", name: "시궁쥐", emoji: "🐀" },
+  { id: "hedgehog", name: "고슴도치", emoji: "🦔" }, { id: "bat", name: "박쥐", emoji: "🦇" },
+  { id: "deer", name: "사슴", emoji: "🦌" }, { id: "rhino", name: "코뿔소", emoji: "🦏" },
+  { id: "zebra", name: "얼룩말", emoji: "🦓" }, { id: "llama", name: "라마", emoji: "🦙" },
+  { id: "beaver", name: "비버", emoji: "🦫" }, { id: "otter", name: "수달", emoji: "🦦" },
+  { id: "sloth", name: "나무늘보", emoji: "🦥" }, { id: "skunk", name: "스컹크", emoji: "🦨" },
+  { id: "crocodile", name: "악어", emoji: "🐊" }, { id: "turtle", name: "거북이", emoji: "🐢" },
+  { id: "trex", name: "티라노", emoji: "🦖" }, { id: "sauropod", name: "브라키오", emoji: "🦕" },
+  { id: "snake", name: "뱀", emoji: "🐍" }, { id: "scorpion", name: "전갈", emoji: "🦂" },
+  { id: "spider", name: "거미", emoji: "🕷️" }, { id: "snail", name: "달팽이", emoji: "🐌" },
+  { id: "ladybug", name: "무당벌레", emoji: "🐞" }, { id: "cricket", name: "귀뚜라미", emoji: "🦗" },
+  { id: "mosquito", name: "모기", emoji: "🦟", aoe: true }, { id: "bee", name: "꿀벌", emoji: "🐝", aoe: true },
+  { id: "ant", name: "개미", emoji: "🐜", aoe: true }, { id: "duck", name: "오리", emoji: "🦆" },
+  { id: "swan", name: "백조", emoji: "🦢" }, { id: "flamingo", name: "플라밍고", emoji: "🦩" },
+  { id: "peacock", name: "공작", emoji: "🦚" }, { id: "turkey", name: "칠면조", emoji: "🦃" },
+  { id: "rooster", name: "수탉", emoji: "🐓" }, { id: "hen", name: "암탉", emoji: "🐔" },
+  { id: "chick", name: "병아리", emoji: "🐣" }, { id: "babychick", name: "삐악이", emoji: "🐥" },
+  { id: "dodo", name: "도도새", emoji: "🦤" }, { id: "eagle", name: "독수리", emoji: "🦅" },
+  { id: "dolphin", name: "돌고래", emoji: "🐬" }, { id: "whale", name: "흰수염고래", emoji: "🐳" },
+  { id: "whale2", name: "향유고래", emoji: "🐋" }, { id: "fish", name: "물고기", emoji: "🐟" },
+  { id: "tropicalfish", name: "열대어", emoji: "🐠" }, { id: "blowfish", name: "복어", emoji: "🐡" },
+  { id: "lobster", name: "랍스터", emoji: "🦞" }, { id: "crab", name: "게", emoji: "🦀" },
+  { id: "shrimp", name: "새우", emoji: "🦐" }, { id: "giraffe", name: "기린", emoji: "🦒" },
+  { id: "leopard", name: "표범", emoji: "🐆" }, { id: "seal", name: "물개", emoji: "🦭" },
+  { id: "poodle", name: "푸들", emoji: "🐩" }, { id: "babydragon", name: "아기드래곤", emoji: "🐲" },
+  { id: "dragon", name: "드래곤", emoji: "🐉" }, { id: "unicorn", name: "유니콘", emoji: "🦄" },
+  { id: "alien", name: "외계인", emoji: "👽" }, { id: "robot", name: "로봇", emoji: "🤖" },
+  { id: "pumpkin", name: "호박", emoji: "🎃" }, { id: "snowman", name: "눈사람", emoji: "⛄" },
+  { id: "donut", name: "도넛", emoji: "🍩" }, { id: "pizza", name: "피자", emoji: "🍕" },
+  { id: "burger", name: "버거", emoji: "🍔" }, { id: "hotdog", name: "핫도그", emoji: "🌭" },
+  { id: "icecream", name: "아이스크림", emoji: "🍦" }, { id: "cupcake", name: "컵케이크", emoji: "🧁" },
+  { id: "cookie", name: "쿠키", emoji: "🍪" }, { id: "chocolate", name: "초코", emoji: "🍫" },
+  { id: "pretzel", name: "프레첼", emoji: "🥨" }, { id: "croissant", name: "크로와상", emoji: "🥐" },
+  { id: "soccerball", name: "축구공", emoji: "⚽" }, { id: "balloon", name: "풍선", emoji: "🎈" },
+  { id: "gem", name: "보석", emoji: "💎" },
+];
+(() => {
+  const roles = ["swarm", "balanced", "tank", "ranged", "heavy"];
+  NEW_CREATURES.forEach((c, i) => {
+    const role = roles[i % roles.length];
+    const variance = ((i % 7) - 3) * 0.04;
+    const stats = rollAllyStats(role, variance);
+    ALLY_TYPES.push({ id: c.id, name: c.name, emoji: c.emoji, aoe: c.aoe, ...stats });
+    EVOLUTION_FORMS[c.id] = makeEvolutionForms(c.emoji, c.evolved, ACC_PALETTE[i % ACC_PALETTE.length]);
+  });
+})();
+
 const FRUITS = [
   { id: "red",    name: "빨강 열매", emoji: "🍎", flavor: "공격력" },
   { id: "orange", name: "주황 열매", emoji: "🍊", flavor: "체력" },
@@ -291,13 +363,43 @@ function defaultSave() {
   };
 }
 const GACHA_COST = 1;
+// 세질수록(비쌀수록) 등급이 높고, 등급이 높을수록 뽑힐 확률은 낮다
+const RARITY_INFO = {
+  normal: { label: "일반",       weight: 45, color: "#999" },
+  rare:   { label: "레어",       weight: 30, color: "#3f8ce0" },
+  super:  { label: "슈퍼레어",   weight: 15, color: "#a855f7" },
+  ultra:  { label: "울트라슈퍼", weight: 7,  color: "#e0a800" },
+  legend: { label: "전설",       weight: 3,  color: "#e04545" },
+};
+function getRarity(cost) {
+  if (cost >= 150) return "legend";
+  if (cost >= 110) return "ultra";
+  if (cost >= 80) return "super";
+  if (cost >= 50) return "rare";
+  return "normal";
+}
+function weightedPickLocked(locked) {
+  const byRarity = {};
+  locked.forEach(t => { const r = getRarity(t.cost); (byRarity[r] = byRarity[r] || []).push(t); });
+  const rarities = Object.keys(byRarity);
+  const totalWeight = rarities.reduce((sum, r) => sum + RARITY_INFO[r].weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const r of rarities) {
+    roll -= RARITY_INFO[r].weight;
+    if (roll <= 0) {
+      const pool = byRarity[r];
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+  }
+  return locked[locked.length - 1];
+}
 function gachaPull() {
   if (save.cards < GACHA_COST) return null;
   save.cards -= GACHA_COST;
   const locked = ALLY_TYPES.filter(t => !save.ownedAllies.includes(t.id));
   let result;
   if (locked.length > 0) {
-    const picked = locked[Math.floor(Math.random() * locked.length)];
+    const picked = weightedPickLocked(locked);
     save.ownedAllies.push(picked.id);
     result = { type: picked };
   } else {
@@ -578,9 +680,11 @@ function renderGacha() {
   gallery.innerHTML = "";
   ALLY_TYPES.forEach(type => {
     const owned = save.ownedAllies.includes(type.id);
+    const rarity = RARITY_INFO[getRarity(type.cost)];
     const slot = document.createElement("div");
     slot.className = "gacha-slot" + (owned ? "" : " locked");
-    slot.innerHTML = `${owned ? type.emoji : "❓"}<span class="g-name">${owned ? type.name : "???"}</span>`;
+    slot.style.boxShadow = `0 3px 0 ${rarity.color}`;
+    slot.innerHTML = `${owned ? type.emoji : "❓"}<span class="g-name">${owned ? type.name : "???"}</span><span class="g-rarity" style="color:${rarity.color}">${rarity.label}</span>`;
     gallery.appendChild(slot);
   });
 }
@@ -1616,7 +1720,7 @@ document.getElementById("btn-gacha-pull").addEventListener("click", () => {
     box.textContent = "🎴 카드가 부족해요!";
   } else if (result.type) {
     playSfx("evolve");
-    box.textContent = `🎉 ${result.type.emoji} ${result.type.name} 획득!`;
+    box.textContent = `🎉 [${RARITY_INFO[getRarity(result.type.cost)].label}] ${result.type.emoji} ${result.type.name} 획득!`;
   } else {
     playSfx("feed");
     box.textContent = `이미 모든 캐릭터를 보유 중! 대신 ${result.consolationFruit.emoji} 열매 5개를 받았어요.`;
