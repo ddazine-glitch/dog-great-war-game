@@ -36,6 +36,22 @@ const ALLY_TYPES = [
   { id: "owl",      name: "부엉이", emoji: "🦉", cost: 65,  cooldown: 2400, hp: 48,  atk: 15, range: 72, atkInterval: 1000, speed: 36 },
   { id: "bear",     name: "곰",     emoji: "🐻", cost: 85,  cooldown: 3200, hp: 220, atk: 14, range: 36, atkInterval: 1300, speed: 22 },
   { id: "elephant", name: "코끼리", emoji: "🐘", cost: 130, cooldown: 5200, hp: 260, atk: 30, range: 46, atkInterval: 1400, speed: 20 },
+  { id: "panda",     name: "판다",     emoji: "🐼", cost: 55,  cooldown: 2200, hp: 140, atk: 12, range: 34, atkInterval: 950,  speed: 34 },
+  { id: "tiger",     name: "호랑이",   emoji: "🐅", cost: 75,  cooldown: 2600, hp: 90,  atk: 26, range: 36, atkInterval: 800,  speed: 50 },
+  { id: "penguin",   name: "펭귄",     emoji: "🐧", cost: 30,  cooldown: 1400, hp: 40,  atk: 8,  range: 30, atkInterval: 700,  speed: 56 },
+  { id: "badger",    name: "오소리",   emoji: "🦡", cost: 70,  cooldown: 2800, hp: 190, atk: 15, range: 32, atkInterval: 1100, speed: 26 },
+  { id: "monkey",    name: "원숭이",   emoji: "🐵", cost: 40,  cooldown: 1800, hp: 55,  atk: 11, range: 32, atkInterval: 750,  speed: 64 },
+  { id: "gorilla",   name: "고릴라",   emoji: "🦍", cost: 110, cooldown: 4000, hp: 300, atk: 22, range: 38, atkInterval: 1300, speed: 20 },
+  { id: "kangaroo",  name: "캥거루",   emoji: "🦘", cost: 60,  cooldown: 2200, hp: 80,  atk: 18, range: 34, atkInterval: 900,  speed: 54 },
+  { id: "koala",     name: "코알라",   emoji: "🐨", cost: 90,  cooldown: 3600, hp: 260, atk: 10, range: 30, atkInterval: 1200, speed: 16 },
+  { id: "camel",     name: "낙타",     emoji: "🐪", cost: 65,  cooldown: 2400, hp: 70,  atk: 17, range: 66, atkInterval: 1000, speed: 30 },
+  { id: "horse",     name: "말",       emoji: "🐴", cost: 45,  cooldown: 1600, hp: 60,  atk: 13, range: 32, atkInterval: 800,  speed: 68 },
+  { id: "cow",       name: "소",       emoji: "🐮", cost: 75,  cooldown: 2800, hp: 210, atk: 13, range: 32, atkInterval: 1100, speed: 24 },
+  { id: "goat",      name: "염소",     emoji: "🐐", cost: 50,  cooldown: 2000, hp: 85,  atk: 16, range: 30, atkInterval: 850,  speed: 46 },
+  { id: "parrot",    name: "앵무새",   emoji: "🦜", cost: 70,  cooldown: 2600, hp: 46,  atk: 17, range: 74, atkInterval: 950,  speed: 38 },
+  { id: "chameleon", name: "카멜레온", emoji: "🦎", cost: 60,  cooldown: 2400, hp: 50,  atk: 24, range: 32, atkInterval: 850,  speed: 40 },
+  { id: "octopus",   name: "문어",     emoji: "🐙", cost: 85,  cooldown: 3000, hp: 100, atk: 13, range: 42, atkInterval: 1000, speed: 28, aoe: true },
+  { id: "shark",     name: "상어",     emoji: "🦈", cost: 150, cooldown: 5600, hp: 200, atk: 40, range: 40, atkInterval: 1300, speed: 22 },
 ];
 
 // 최종 보스전에서만 등장하는 특별 영웅 - 돈으로 못 뽑고, 보스전 시작할 때 자동으로 주어지고 선택된다
@@ -151,6 +167,37 @@ const EVOLUTION_FORMS = {
   ],
 };
 
+// 캐릭터를 많이 추가할 때, 6단계 진화 실루엣을 매번 손으로 다 쓰지 않고 일관된 패턴으로 생성한다
+function makeEvolutionForms(base, evolved, acc) {
+  const e2 = evolved || base;
+  return [
+    { emoji: base, accessories: [] },
+    { emoji: base, accessories: [{ emoji: acc, dx: -16, dy: -6, scale: 0.5 }] },
+    { emoji: base, accessories: [{ emoji: acc, dx: -16, dy: -6, scale: 0.55 }, { emoji: acc, dx: 16, dy: -6, scale: 0.45 }] },
+    { emoji: e2, accessories: [{ emoji: acc, dx: -16, dy: -6, scale: 0.55 }] },
+    { emoji: e2, accessories: [{ emoji: acc, dx: -16, dy: -6, scale: 0.6 }, { emoji: "✨", dx: 16, dy: -22, scale: 0.5 }] },
+    { emoji: e2, accessories: [{ emoji: acc, dx: -16, dy: -6, scale: 0.75 }, { emoji: "✨", dx: 16, dy: -22, scale: 0.65 }, { emoji: "🔥", dx: 0, dy: -30, scale: 0.5 }] },
+  ];
+}
+Object.assign(EVOLUTION_FORMS, {
+  panda:     makeEvolutionForms("🐼", null, "🎋"),
+  tiger:     makeEvolutionForms("🐅", null, "🔥"),
+  penguin:   makeEvolutionForms("🐧", null, "❄️"),
+  badger:    makeEvolutionForms("🦡", null, "🛡️"),
+  monkey:    makeEvolutionForms("🐵", null, "💨"),
+  gorilla:   makeEvolutionForms("🦍", null, "💪"),
+  kangaroo:  makeEvolutionForms("🦘", null, "💨"),
+  koala:     makeEvolutionForms("🐨", null, "🛡️"),
+  camel:     makeEvolutionForms("🐪", "🐫", "🔥"),
+  horse:     makeEvolutionForms("🐴", "🐎", "💨"),
+  cow:       makeEvolutionForms("🐮", "🐂", "⚔️"),
+  goat:      makeEvolutionForms("🐐", null, "⚔️"),
+  parrot:    makeEvolutionForms("🦜", null, "🌙"),
+  chameleon: makeEvolutionForms("🦎", null, "🗡️"),
+  octopus:   makeEvolutionForms("🐙", null, "💥"),
+  shark:     makeEvolutionForms("🦈", null, "🩸"),
+});
+
 const FRUITS = [
   { id: "red",    name: "빨강 열매", emoji: "🍎", flavor: "공격력" },
   { id: "orange", name: "주황 열매", emoji: "🍊", flavor: "체력" },
@@ -170,12 +217,13 @@ const CAT_DEFS = {
   boss:   { name: "보스 고양이", emoji: "🐯", badge: "👑", tier: 4, hp: 3200, atk: 48, speed: 14, range: 44, atkInterval: 850 },
   ninja:  { name: "닌자 고양이", emoji: "🐱", badge: "🥷", tier: 2, hp: 130, atk: 22, speed: 30, range: 30, atkInterval: 800 },
   ice:    { name: "얼음 고양이", emoji: "🐱", badge: "❄️", tier: 3, hp: 240, atk: 23, speed: 20, range: 36, atkInterval: 900 },
+  ghost:  { name: "유령 고양이", emoji: "👻", tier: 3, hp: 210, atk: 28, speed: 34, range: 34, atkInterval: 800 },
   gold:   { name: "황금 고양이", emoji: "🐱", badge: "💰", tier: 0, hp: 70, atk: 4, speed: 26, range: 28, atkInterval: 1200, special: "gold" },
 };
 const TIER_POOL = {
   1: ["white", "gray", "black"],
   2: ["armor", "horn", "ninja"],
-  3: ["wing", "energy", "ice"],
+  3: ["wing", "energy", "ice", "ghost"],
 };
 const GOLD_CAT_CHANCE = 0.04; // 어느 세계에서든 낮은 확률로 등장하는 보상용 "좋은" 고양이
 
@@ -189,16 +237,19 @@ const STAGES = (() => {
     const pool = world === 1 ? [1] : world === 2 ? [1, 2] : [1, 2, 3];
     for (let s = 1; s <= STAGES_PER_WORLD[world - 1]; s++) {
       gi++;
+      const isMiniBoss = s % 10 === 0; // 10스테이지마다 중간중간 미니보스 등장
       list.push({
         id: `${world}-${s}`,
-        label: `${world}-${s}`,
+        label: isMiniBoss ? `${world}-${s} 👹` : `${world}-${s}`,
         world, chapter: world, stageNum: s, globalIndex: gi,
         tierPool: pool,
-        enemyBaseMaxHp: 260 + gi * 40,
-        spawnInterval: Math.max(650, 2600 - gi * 2.2),
-        catStatMul: 1 + (gi - 1) * 0.014,
+        includeBoss: isMiniBoss,
+        miniBoss: isMiniBoss,
+        enemyBaseMaxHp: (260 + gi * 60) * (isMiniBoss ? 1.6 : 1),
+        spawnInterval: Math.max(600, 2600 - gi * 3.2) * (isMiniBoss ? 0.7 : 1),
+        catStatMul: (1 + (gi - 1) * 0.022) * (isMiniBoss ? 1.4 : 1),
         moneyPerTick: 5 + gi * 0.05,
-        fruitReward: 2 + Math.floor(gi / 40),
+        fruitReward: 2 + Math.floor(gi / 40) + (isMiniBoss ? 3 : 0),
         isBoss: false,
       });
     }
@@ -207,8 +258,8 @@ const STAGES = (() => {
     list.push({
       id: `${world}-boss`, label: `${world}세계 보스전`, world, chapter: world, stageNum: "boss", globalIndex: gi,
       tierPool: pool, includeBoss: true, worldBoss: true,
-      enemyBaseMaxHp: (260 + gi * 40) * 3, spawnInterval: Math.max(650, 2600 - gi * 2.2) * 0.6,
-      catStatMul: (1 + (gi - 1) * 0.014) * 1.8,
+      enemyBaseMaxHp: (260 + gi * 60) * 3, spawnInterval: Math.max(600, 2600 - gi * 3.2) * 0.6,
+      catStatMul: (1 + (gi - 1) * 0.022) * 1.8,
       moneyPerTick: (5 + gi * 0.05) * 1.5, fruitReward: 20 + world * 15,
       isBoss: true,
     });
@@ -218,7 +269,7 @@ const STAGES = (() => {
   list.push({
     id: "final-boss", label: "최종 보스전", world: WORLD_COUNT + 1, chapter: WORLD_COUNT + 1, stageNum: "final", globalIndex: gi,
     tierPool: [1, 2, 3], includeBoss: true, finalBoss: true,
-    enemyBaseMaxHp: 9000, spawnInterval: 500, catStatMul: 8,
+    enemyBaseMaxHp: 12000, spawnInterval: 450, catStatMul: 11,
     moneyPerTick: 20, fruitReward: 100,
     isBoss: true,
   });
@@ -406,9 +457,9 @@ function renderStageGrid() {
     const btn = document.createElement("button");
     const unlocked = st.globalIndex <= save.unlockedIndex;
     const cleared = st.globalIndex < save.unlockedIndex;
-    btn.className = "stage-btn" + (unlocked ? "" : " locked") + (cleared ? " cleared" : "");
-    btn.textContent = st.stageNum;
-    btn.title = st.label;
+    btn.className = "stage-btn" + (unlocked ? "" : " locked") + (cleared ? " cleared" : "") + (st.miniBoss ? " mini-boss" : "");
+    btn.textContent = st.miniBoss ? `${st.stageNum}👹` : st.stageNum;
+    btn.title = st.miniBoss ? `${st.label} (미니보스)` : st.label;
     btn.disabled = !unlocked;
     btn.addEventListener("click", () => { playSfx("click"); startStage(st); });
     grid.appendChild(btn);
@@ -739,7 +790,7 @@ function opponentAutoSpawnTick() {
 function pickCatId(stageDef) {
   const pool = [];
   stageDef.tierPool.forEach(tier => pool.push(...TIER_POOL[tier]));
-  if (stageDef.includeBoss && Math.random() < (stageDef.finalBoss ? 0.3 : stageDef.worldBoss ? 0.2 : 0.12)) return "boss";
+  if (stageDef.includeBoss && Math.random() < (stageDef.finalBoss ? 0.3 : stageDef.worldBoss ? 0.2 : stageDef.miniBoss ? 0.16 : 0.12)) return "boss";
   if (Math.random() < GOLD_CAT_CHANCE) return "gold";
   return pool[Math.floor(Math.random() * pool.length)];
 }

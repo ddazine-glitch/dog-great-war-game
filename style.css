@@ -106,6 +106,8 @@ button {
   cursor: not-allowed;
 }
 .stage-btn.cleared { background: #c8f2c0; box-shadow: 0 3px 0 #6fbf73; }
+.stage-btn.mini-boss { background: #ffd0a0; box-shadow: 0 3px 0 #d98a3f; font-size: .95em; }
+.stage-btn.mini-boss.cleared { background: #c8f2c0; box-shadow: 0 3px 0 #6fbf73; }
 .stage-btn.boss { grid-column: 1 / -1; aspect-ratio: unset; padding: 14px; background: #ffb3b3; box-shadow: 0 3px 0 #d95050; font-size: 1.2em; }
 .stage-btn.boss.cleared { background: #ffe08a; box-shadow: 0 3px 0 #d9a12d; }
 .row-buttons { margin-top: 10px; }
