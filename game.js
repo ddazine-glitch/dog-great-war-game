@@ -41,7 +41,6 @@ const UPGRADE_MAX = 3;
 const UPGRADE_COST = { 2: 5, 3: 5 };
 const BASE_HP_MUL = { 1: 1, 2: 1.6, 3: 2.4 };
 const CANNON_DMG_MUL = { 1: 0.4, 2: 0.7, 3: 1.0 };
-const CANNON_CHARGE_MUL = { 1: 1, 2: 0.85, 3: 0.7 };
 
 const ALLY_TYPES = [
   { id: "hippo",    name: "하마",   emoji: "🦛", cost: 50,  cooldown: 2600, hp: 130, atk: 11, range: 42, atkInterval: 1200, speed: 34 },
@@ -919,8 +918,6 @@ function startStage(stageDef) {
     playerBaseMaxHp: playerBaseMaxHp,
     cooldowns: {},
     spawnTimer: 900,
-    cannonCharge: 0,
-    cannonMax: 5000 * CANNON_CHARGE_MUL[save.cannonLevel],
     autoSpawn: false,
     bossWave: null,
     bossWaveTimer: 3000,
@@ -970,8 +967,6 @@ function startPvpBattle(oppData) {
     cooldowns: {},
     oppCooldowns: {},
     spawnTimer: Infinity,
-    cannonCharge: 0,
-    cannonMax: 5000 * CANNON_CHARGE_MUL[save.cannonLevel],
     autoSpawn: false,
     bossWave: null,
     bossWaveTimer: Infinity,
@@ -1235,53 +1230,37 @@ function attackBase(attackerSide, dmg) {
   }
 }
 
-function updateCannon(dt) {
-  if (battle.cannonCharge < battle.cannonMax) {
-    battle.cannonCharge = Math.min(battle.cannonMax, battle.cannonCharge + dt);
-  }
-  if (battle.cannonCharge >= battle.cannonMax) {
-    fireCannon(1);
-  }
-  document.getElementById("cannon-fill").style.width = `${(battle.cannonCharge / battle.cannonMax) * 100}%`;
-  document.getElementById("cannon-label").textContent = battle.cannonCharge >= battle.cannonMax ? "🐶💥 발사!" : "🐶💥 대포 충전중";
-}
 const CANNON_FLIGHT_SPEED = 1500; // px/sec, 포탄이 화면을 가로지르는 속도
 
-function fireCannon(chargeRatio) {
-  const dmg = Math.round((220 + battle.stage.globalIndex * 32) * chargeRatio * CANNON_DMG_MUL[save.cannonLevel]);
-  // 포탄 대신 큰 파도가 기지에서 밀려나가 사정거리(내 기지~적 기지) 끝까지 휩쓸고 간다
-  battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, dmg, hit: false, trail: [], level: save.cannonLevel });
+function fireCannon() {
+  // 쿨타임 없이 누르는 즉시 항상 최대 위력으로 발사된다
+  const dmg = Math.round((220 + battle.stage.globalIndex * 32) * CANNON_DMG_MUL[save.cannonLevel]);
+  battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, dmg, hit: false, trail: [], level: save.cannonLevel, hitIds: new Set() });
   spawnBurst(RIGHT_BASE_X - 30, LANE_Y - 6, "#5ec8e8");
   playSfx("cannon");
-  battle.cannonCharge = 0;
 }
 function updateProjectiles(dt) {
   for (const p of battle.projectiles) {
     p.trail.push(p.x);
     if (p.trail.length > 5) p.trail.shift();
-    // 매 프레임 파도 앞(왼쪽)에 아직 남아있는 가장 가까운 적을 다시 찾는다
-    // (죽은 적을 그대로 통과해서 기지까지 뚫고 가버리는 것을 막기 위함)
-    let target = null, bestX = -Infinity;
-    for (const u of battle.units) {
-      if (u.dead || u.side !== "enemy") continue;
-      if (u.x <= p.x + 1 && u.x > bestX) { bestX = u.x; target = u; }
-    }
-    const targetX = target ? target.x : LEFT_BASE_X;
     const step = CANNON_FLIGHT_SPEED * (dt / 1000);
-    if (p.x - targetX <= step) {
-      p.x = targetX;
-      p.hit = true;
-      if (target) {
-        dealDamageToUnit(target, p.dmg);
-        target.x = Math.max(ENEMY_SPAWN_X, target.x - 30); // 넉백: 적 기지 쪽으로 밀려남
-        spawnBurst(target.x, target.y - 20, "#5ec8e8");
-      } else {
-        attackBase("ally", p.dmg);
-        spawnBurst(LEFT_BASE_X, LANE_Y - 6, "#5ec8e8");
-        spawnFloatText(LEFT_BASE_X, LANE_Y - 90, `기지 명중 -${p.dmg}`, "#e04545");
+    const newX = p.x - step;
+    // 파도는 적을 통과하면서 그 자리에 있던 모든 적에게 데미지를 주고 계속 나간다 (한 명에서 멈추지 않음)
+    for (const u of battle.units) {
+      if (u.dead || u.side !== "enemy" || p.hitIds.has(u)) continue;
+      if (u.x <= p.x && u.x >= newX) {
+        dealDamageToUnit(u, p.dmg);
+        u.x = Math.max(ENEMY_SPAWN_X, u.x - 20); // 넉백: 적 기지 쪽으로 살짝 밀려남
+        spawnBurst(u.x, u.y - 20, "#5ec8e8");
+        p.hitIds.add(u);
       }
-    } else {
-      p.x -= step;
+    }
+    p.x = newX;
+    if (p.x <= LEFT_BASE_X) {
+      p.hit = true;
+      attackBase("ally", p.dmg);
+      spawnBurst(LEFT_BASE_X, LANE_Y - 6, "#5ec8e8");
+      spawnFloatText(LEFT_BASE_X, LANE_Y - 90, `기지 명중 -${p.dmg}`, "#e04545");
     }
   }
   battle.projectiles = battle.projectiles.filter(p => !p.hit);
@@ -1366,6 +1345,10 @@ document.getElementById("btn-autospawn").addEventListener("click", (e) => {
   e.currentTarget.classList.toggle("on", battle.autoSpawn);
   e.currentTarget.textContent = battle.autoSpawn ? "🔁 자동 소환 ON" : "🔁 자동 소환 OFF";
   playSfx("click");
+});
+document.getElementById("btn-cannon").addEventListener("click", () => {
+  if (!battle || battle.over) return;
+  fireCannon(); // 쿨타임 없이 누르는 즉시 발사
 });
 
 const ITEM_DURATION = 12000; // 아이템 효과 지속시간(ms)
@@ -1770,7 +1753,6 @@ function gameLoop(now) {
 
     for (const u of battle.units) updateUnit(u, dt);
     battle.units = battle.units.filter(u => !u.dead);
-    updateCannon(dt);
     updateProjectiles(dt);
     if (battle.autoSpawn) autoSpawnTick();
     updateBossWave(dt);

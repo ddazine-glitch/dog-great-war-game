@@ -306,9 +306,11 @@ button {
   justify-content: center;
   margin: 8px 0;
 }
-#cannon-label { font-weight: bold; font-size: .9em; color: #a85f1c; }
-#cannon-bar { width: 160px; height: 10px; background: #eee; border-radius: 999px; overflow: hidden; }
-#cannon-fill { height: 100%; width: 0%; background: linear-gradient(#ffb85a, #ff7a1c); }
+#btn-cannon {
+  border: none; border-radius: 999px; padding: 8px 16px; font-weight: bold;
+  background: #ffb85a; cursor: pointer; box-shadow: 0 3px 0 #cc7a1c;
+}
+#btn-cannon:active { transform: translateY(2px); box-shadow: 0 1px 0 #cc7a1c; }
 
 #btn-autospawn {
   border: none; border-radius: 999px; padding: 8px 16px; font-weight: bold;
