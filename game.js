@@ -298,17 +298,17 @@ const FRUITS = [
 ];
 
 const CAT_DEFS = {
-  white:  { name: "흰 고양이",   emoji: "🐱", tier: 1, hp: 65,  atk: 9,  speed: 24, range: 30, atkInterval: 1000 },
-  gray:   { name: "회색 고양이", emoji: "🐈", tier: 1, hp: 70,  atk: 9,  speed: 24, range: 30, atkInterval: 1000 },
-  black:  { name: "검은 고양이", emoji: "🐈‍⬛", tier: 1, hp: 75,  atk: 11, speed: 23, range: 30, atkInterval: 1000, trait: "black" },
-  armor:  { name: "갑옷 고양이", emoji: "🐱", badge: "🛡️", tier: 2, hp: 150, atk: 15, speed: 20, range: 32, atkInterval: 1000, trait: "metal" },
-  horn:   { name: "뿔 고양이",   emoji: "🐱", badge: "😈", tier: 2, hp: 140, atk: 19, speed: 22, range: 32, atkInterval: 950 },
-  wing:   { name: "날개 고양이", emoji: "🐱", badge: "🦋", tier: 3, hp: 220, atk: 26, speed: 26, range: 34, atkInterval: 900, trait: "angel" },
-  energy: { name: "에너지 고양이", emoji: "🐱", badge: "⚡", tier: 3, hp: 230, atk: 29, speed: 24, range: 36, atkInterval: 850, trait: "alien" },
-  boss:   { name: "보스 고양이", emoji: "🐯", badge: "👑", tier: 4, hp: 3200, atk: 48, speed: 14, range: 44, atkInterval: 850, trait: "alien" },
-  ninja:  { name: "닌자 고양이", emoji: "🐱", badge: "🥷", tier: 2, hp: 130, atk: 22, speed: 30, range: 30, atkInterval: 800 },
-  ice:    { name: "얼음 고양이", emoji: "🐱", badge: "❄️", tier: 3, hp: 240, atk: 23, speed: 20, range: 36, atkInterval: 900, trait: "metal" },
-  ghost:  { name: "유령 고양이", emoji: "👻", tier: 3, hp: 210, atk: 28, speed: 34, range: 34, atkInterval: 800, trait: "ghost" },
+  white:  { name: "흰 고양이",   emoji: "🐱", tier: 1, hp: 110,  atk: 9,  speed: 24, range: 30, atkInterval: 1000 },
+  gray:   { name: "회색 고양이", emoji: "🐈", tier: 1, hp: 120,  atk: 9,  speed: 24, range: 30, atkInterval: 1000 },
+  black:  { name: "검은 고양이", emoji: "🐈‍⬛", tier: 1, hp: 130,  atk: 11, speed: 23, range: 30, atkInterval: 1000, trait: "black" },
+  armor:  { name: "갑옷 고양이", emoji: "🐱", badge: "🛡️", tier: 2, hp: 260, atk: 15, speed: 20, range: 32, atkInterval: 1000, trait: "metal" },
+  horn:   { name: "뿔 고양이",   emoji: "🐱", badge: "😈", tier: 2, hp: 240, atk: 19, speed: 22, range: 32, atkInterval: 950 },
+  wing:   { name: "날개 고양이", emoji: "🐱", badge: "🦋", tier: 3, hp: 380, atk: 26, speed: 26, range: 34, atkInterval: 900, trait: "angel" },
+  energy: { name: "에너지 고양이", emoji: "🐱", badge: "⚡", tier: 3, hp: 400, atk: 29, speed: 24, range: 36, atkInterval: 850, trait: "alien" },
+  boss:   { name: "보스 고양이", emoji: "🐯", badge: "👑", tier: 4, hp: 5500, atk: 48, speed: 14, range: 44, atkInterval: 850, trait: "alien" },
+  ninja:  { name: "닌자 고양이", emoji: "🐱", badge: "🥷", tier: 2, hp: 220, atk: 22, speed: 30, range: 30, atkInterval: 800 },
+  ice:    { name: "얼음 고양이", emoji: "🐱", badge: "❄️", tier: 3, hp: 410, atk: 23, speed: 20, range: 36, atkInterval: 900, trait: "metal" },
+  ghost:  { name: "유령 고양이", emoji: "👻", tier: 3, hp: 360, atk: 28, speed: 34, range: 34, atkInterval: 800, trait: "ghost" },
   gold:   { name: "황금 고양이", emoji: "🐱", badge: "💰", tier: 0, hp: 70, atk: 4, speed: 26, range: 28, atkInterval: 1200, special: "gold" },
 };
 const TIER_POOL = {
@@ -818,6 +818,24 @@ function createHero() {
   return u;
 }
 
+// 고양이 데미지는 "내가 키운 강아지 화력의 80% 정도" 를 목표로, 내 부대 평균 공격력에 맞춰 매 전투마다 다시 계산한다
+const ENEMY_ATK_PLAYER_RATIO = 0.8;
+const CAT_TIER1_REF_ATK = (CAT_DEFS.white.atk + CAT_DEFS.gray.atk + CAT_DEFS.black.atk) / 3;
+function computePlayerAvgAtk() {
+  if (!save.ownedAllies || !save.ownedAllies.length) return null;
+  const total = save.ownedAllies.reduce((sum, id) => {
+    const base = ALLY_TYPES.find(t => t.id === id);
+    if (!base) return sum;
+    const stage = (save.allies[id] || {}).stage || 1;
+    return sum + base.atk * (STAGE_ATK_MUL[stage] || 1);
+  }, 0);
+  return total / save.ownedAllies.length;
+}
+function computeDynamicCatAtkMul() {
+  const avgAtk = computePlayerAvgAtk();
+  if (!avgAtk) return 1;
+  return Math.max(0.6, (avgAtk * ENEMY_ATK_PLAYER_RATIO) / CAT_TIER1_REF_ATK);
+}
 function createEnemy(catId, mul) {
   const def = CAT_DEFS[catId];
   const u = new Unit("enemy", ENEMY_SPAWN_X);
@@ -829,7 +847,8 @@ function createEnemy(catId, mul) {
   u.trait = def.trait || null;
   u.maxHp = Math.round(def.hp * mul);
   u.hp = u.maxHp;
-  u.atk = Math.round(def.atk * mul);
+  const dynAtkMul = (battle && battle.dynamicCatAtkMul) || 1;
+  u.atk = Math.round(def.atk * mul * dynAtkMul);
   u.range = def.range;
   u.speed = def.speed;
   u.atkInterval = def.atkInterval;
@@ -857,6 +876,7 @@ function startStage(stageDef) {
     bossWaveTimer: 3000,
     itemUsed: { speed: false, atk: false, gold: false },
     itemTimer: { speed: 0, atk: 0, gold: 0 },
+    dynamicCatAtkMul: computeDynamicCatAtkMul(),
     over: false,
     lastTime: performance.now(),
   };
@@ -907,6 +927,7 @@ function startPvpBattle(oppData) {
     bossWaveTimer: Infinity,
     itemUsed: { speed: false, atk: false, gold: false },
     itemTimer: { speed: 0, atk: 0, gold: 0 },
+    dynamicCatAtkMul: 1,
     over: false,
     lastTime: performance.now(),
   };
