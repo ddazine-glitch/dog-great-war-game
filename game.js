@@ -548,16 +548,26 @@ function renderBaseCannonUpgrades() {
 
 /* ===================== 코드 대전 (서버 없는 async PvP) ===================== */
 function exportPvpCode() {
-  const stages = {};
-  ALLY_TYPES.forEach(t => { stages[t.id] = save.allies[t.id].stage; });
-  const data = { o: save.ownedAllies, s: stages, b: save.baseLevel };
-  return btoa(encodeURIComponent(JSON.stringify(data)));
+  // 소유한 캐릭터만 "id:단계"로 짧게 이어붙여서 코드를 최대한 짧게 만든다
+  const parts = save.ownedAllies.map(id => `${id}:${(save.allies[id] || {}).stage || 1}`);
+  return `b${save.baseLevel}|${parts.join(",")}`;
 }
 function importPvpCode(code) {
   try {
-    const data = JSON.parse(decodeURIComponent(atob(code.trim())));
-    if (!Array.isArray(data.o) || typeof data.s !== "object") return null;
-    return data;
+    const trimmed = code.trim();
+    const bar = trimmed.indexOf("|");
+    if (bar < 0 || trimmed[0] !== "b") return null;
+    const b = parseInt(trimmed.slice(1, bar), 10) || 1;
+    const o = [];
+    const s = {};
+    trimmed.slice(bar + 1).split(",").filter(Boolean).forEach(pair => {
+      const [id, stage] = pair.split(":");
+      if (!ALLY_TYPES.find(t => t.id === id)) return;
+      o.push(id);
+      s[id] = Math.min(STAGE_MAX, Math.max(1, parseInt(stage, 10) || 1));
+    });
+    if (o.length === 0) return null;
+    return { o, s, b };
   } catch (e) { return null; }
 }
 function renderGacha() {
