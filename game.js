@@ -870,7 +870,7 @@ function startStage(stageDef) {
     cooldowns: {},
     spawnTimer: 900,
     cannonCharge: 0,
-    cannonMax: 5000 * CANNON_CHARGE_MUL[save.cannonLevel],
+    cannonMax: 15000 * CANNON_CHARGE_MUL[save.cannonLevel],
     autoSpawn: false,
     bossWave: null,
     bossWaveTimer: 3000,
@@ -921,7 +921,7 @@ function startPvpBattle(oppData) {
     oppCooldowns: {},
     spawnTimer: Infinity,
     cannonCharge: 0,
-    cannonMax: 5000 * CANNON_CHARGE_MUL[save.cannonLevel],
+    cannonMax: 15000 * CANNON_CHARGE_MUL[save.cannonLevel],
     autoSpawn: false,
     bossWave: null,
     bossWaveTimer: Infinity,
@@ -1191,7 +1191,7 @@ function updateCannon(dt) {
 const CANNON_FLIGHT_SPEED = 1500; // px/sec, 포탄이 화면을 가로지르는 속도
 
 function fireCannon(chargeRatio) {
-  const dmg = Math.round((420 + battle.stage.globalIndex * 60) * chargeRatio * CANNON_DMG_MUL[save.cannonLevel]);
+  const dmg = Math.round((220 + battle.stage.globalIndex * 32) * chargeRatio * CANNON_DMG_MUL[save.cannonLevel]);
   // 포탄 대신 큰 파도가 기지에서 밀려나가 사정거리(내 기지~적 기지) 끝까지 휩쓸고 간다
   battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, dmg, hit: false, trail: [], level: save.cannonLevel });
   spawnBurst(RIGHT_BASE_X - 30, LANE_Y - 6, "#5ec8e8");
