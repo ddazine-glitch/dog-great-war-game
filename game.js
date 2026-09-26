@@ -19,7 +19,7 @@ const STAGE_UP_THRESHOLDS = { 2: 3, 3: 7, 4: 12, 5: 18, 6: 25 };
 const UPGRADE_MAX = 3;
 const UPGRADE_COST = { 2: 10, 3: 25 }; // 다음 단계까지 필요한 누적 열매 수
 const BASE_HP_MUL = { 1: 1, 2: 1.6, 3: 2.4 };
-const CANNON_DMG_MUL = { 1: 1, 2: 1.5, 3: 2.2 };
+const CANNON_DMG_MUL = { 1: 0.4, 2: 0.7, 3: 1.0 };
 const CANNON_CHARGE_MUL = { 1: 1, 2: 0.85, 3: 0.7 };
 
 const ALLY_TYPES = [
@@ -160,17 +160,17 @@ const FRUITS = [
 ];
 
 const CAT_DEFS = {
-  white:  { name: "흰 고양이",   emoji: "🐱", tier: 1, hp: 42,  atk: 6,  speed: 24, range: 30, atkInterval: 1000 },
-  gray:   { name: "회색 고양이", emoji: "🐈", tier: 1, hp: 46,  atk: 6,  speed: 24, range: 30, atkInterval: 1000 },
-  black:  { name: "검은 고양이", emoji: "🐈‍⬛", tier: 1, hp: 50,  atk: 7,  speed: 23, range: 30, atkInterval: 1000 },
-  armor:  { name: "갑옷 고양이", emoji: "🐱", badge: "🛡️", tier: 2, hp: 100, atk: 10, speed: 20, range: 32, atkInterval: 1000 },
-  horn:   { name: "뿔 고양이",   emoji: "🐱", badge: "😈", tier: 2, hp: 90,  atk: 13, speed: 22, range: 32, atkInterval: 950 },
-  wing:   { name: "날개 고양이", emoji: "🐱", badge: "🦋", tier: 3, hp: 150, atk: 18, speed: 26, range: 34, atkInterval: 900 },
-  energy: { name: "에너지 고양이", emoji: "🐱", badge: "⚡", tier: 3, hp: 160, atk: 20, speed: 24, range: 36, atkInterval: 850 },
-  boss:   { name: "보스 고양이", emoji: "🐯", badge: "👑", tier: 4, hp: 2200, atk: 34, speed: 14, range: 44, atkInterval: 850 },
-  ninja:  { name: "닌자 고양이", emoji: "🐱", badge: "🥷", tier: 2, hp: 85,  atk: 15, speed: 30, range: 30, atkInterval: 800 },
-  ice:    { name: "얼음 고양이", emoji: "🐱", badge: "❄️", tier: 3, hp: 170, atk: 16, speed: 20, range: 36, atkInterval: 900 },
-  gold:   { name: "황금 고양이", emoji: "🐱", badge: "💰", tier: 0, hp: 55, atk: 4, speed: 26, range: 28, atkInterval: 1200, special: "gold" },
+  white:  { name: "흰 고양이",   emoji: "🐱", tier: 1, hp: 65,  atk: 9,  speed: 24, range: 30, atkInterval: 1000 },
+  gray:   { name: "회색 고양이", emoji: "🐈", tier: 1, hp: 70,  atk: 9,  speed: 24, range: 30, atkInterval: 1000 },
+  black:  { name: "검은 고양이", emoji: "🐈‍⬛", tier: 1, hp: 75,  atk: 11, speed: 23, range: 30, atkInterval: 1000 },
+  armor:  { name: "갑옷 고양이", emoji: "🐱", badge: "🛡️", tier: 2, hp: 150, atk: 15, speed: 20, range: 32, atkInterval: 1000 },
+  horn:   { name: "뿔 고양이",   emoji: "🐱", badge: "😈", tier: 2, hp: 140, atk: 19, speed: 22, range: 32, atkInterval: 950 },
+  wing:   { name: "날개 고양이", emoji: "🐱", badge: "🦋", tier: 3, hp: 220, atk: 26, speed: 26, range: 34, atkInterval: 900 },
+  energy: { name: "에너지 고양이", emoji: "🐱", badge: "⚡", tier: 3, hp: 230, atk: 29, speed: 24, range: 36, atkInterval: 850 },
+  boss:   { name: "보스 고양이", emoji: "🐯", badge: "👑", tier: 4, hp: 3200, atk: 48, speed: 14, range: 44, atkInterval: 850 },
+  ninja:  { name: "닌자 고양이", emoji: "🐱", badge: "🥷", tier: 2, hp: 130, atk: 22, speed: 30, range: 30, atkInterval: 800 },
+  ice:    { name: "얼음 고양이", emoji: "🐱", badge: "❄️", tier: 3, hp: 240, atk: 23, speed: 20, range: 36, atkInterval: 900 },
+  gold:   { name: "황금 고양이", emoji: "🐱", badge: "💰", tier: 0, hp: 70, atk: 4, speed: 26, range: 28, atkInterval: 1200, special: "gold" },
 };
 const TIER_POOL = {
   1: ["white", "gray", "black"],
@@ -194,9 +194,9 @@ const STAGES = (() => {
         label: `${world}-${s}`,
         world, chapter: world, stageNum: s, globalIndex: gi,
         tierPool: pool,
-        enemyBaseMaxHp: 260 + gi * 18,
+        enemyBaseMaxHp: 260 + gi * 40,
         spawnInterval: Math.max(650, 2600 - gi * 2.2),
-        catStatMul: 1 + (gi - 1) * 0.0065,
+        catStatMul: 1 + (gi - 1) * 0.014,
         moneyPerTick: 5 + gi * 0.05,
         fruitReward: 2 + Math.floor(gi / 40),
         isBoss: false,
@@ -207,8 +207,8 @@ const STAGES = (() => {
     list.push({
       id: `${world}-boss`, label: `${world}세계 보스전`, world, chapter: world, stageNum: "boss", globalIndex: gi,
       tierPool: pool, includeBoss: true, worldBoss: true,
-      enemyBaseMaxHp: (260 + gi * 18) * 3, spawnInterval: Math.max(650, 2600 - gi * 2.2) * 0.6,
-      catStatMul: (1 + (gi - 1) * 0.0065) * 1.8,
+      enemyBaseMaxHp: (260 + gi * 40) * 3, spawnInterval: Math.max(650, 2600 - gi * 2.2) * 0.6,
+      catStatMul: (1 + (gi - 1) * 0.014) * 1.8,
       moneyPerTick: (5 + gi * 0.05) * 1.5, fruitReward: 20 + world * 15,
       isBoss: true,
     });
