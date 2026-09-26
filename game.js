@@ -7,6 +7,7 @@ const ALLY_SPAWN_X = RIGHT_BASE_X - 40;
 const ENEMY_SPAWN_X = LEFT_BASE_X + 40;
 const PLAYER_BASE_MAX_HP = 500;
 const MAX_ENEMIES_ON_FIELD = 20; // 화면에 적이 한꺼번에 몰려 겹치지 않도록 동시 등장 상한
+const MAX_ALLIES_ON_FIELD = 20; // 아군도 너무 많이 쌓이지 않도록 동시 소환 상한
 const SAVE_KEY = "doggreatwar_save_v1";
 
 // 특성 시스템: 적에게는 "속성", 아군은 6단계까지 강화하면 특정 속성에 강해지고(대신 다른 속성엔 약해짐)
@@ -1038,6 +1039,12 @@ function renderUnitBar() {
 function trySpawnAlly(typeId) {
   if (!battle || battle.over) return;
   if (!save.ownedAllies.includes(typeId)) return;
+  const allyCount = battle.units.reduce((n, u) => n + (u.side === "ally" && !u.dead ? 1 : 0), 0);
+  if (allyCount >= MAX_ALLIES_ON_FIELD) {
+    playSfx("noMoney");
+    spawnFloatText(ALLY_SPAWN_X, LANE_Y - 40, "부대 가득 참!", "#d33");
+    return;
+  }
   const stats = getAllyStats(typeId);
   if (battle.money < stats.base.cost) {
     playSfx("noMoney");
