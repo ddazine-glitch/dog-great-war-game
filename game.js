@@ -179,7 +179,7 @@ const TIER_POOL = {
 };
 const GOLD_CAT_CHANCE = 0.04; // 어느 세계에서든 낮은 확률로 등장하는 보상용 "좋은" 고양이
 
-const STAGES_PER_WORLD = 300;
+const STAGES_PER_WORLD = [50, 60, 40]; // 세계별 스테이지 수 (1세계 50개, 2세계 60개, 3세계 40개)
 const WORLD_COUNT = 3;
 
 const STAGES = (() => {
@@ -187,7 +187,7 @@ const STAGES = (() => {
   let gi = 0;
   for (let world = 1; world <= WORLD_COUNT; world++) {
     const pool = world === 1 ? [1] : world === 2 ? [1, 2] : [1, 2, 3];
-    for (let s = 1; s <= STAGES_PER_WORLD; s++) {
+    for (let s = 1; s <= STAGES_PER_WORLD[world - 1]; s++) {
       gi++;
       list.push({
         id: `${world}-${s}`,
@@ -203,7 +203,7 @@ const STAGES = (() => {
       });
     }
     gi++;
-    // 각 세계의 300스테이지를 전부 깨야 도전할 수 있는 세계 보스전
+    // 각 세계의 스테이지를 전부 깨야 도전할 수 있는 세계 보스전
     list.push({
       id: `${world}-boss`, label: `${world}세계 보스전`, world, chapter: world, stageNum: "boss", globalIndex: gi,
       tierPool: pool, includeBoss: true, worldBoss: true,
@@ -239,7 +239,7 @@ function defaultSave() {
     cards: 0,
   };
 }
-const GACHA_COST = 15;
+const GACHA_COST = 1;
 function gachaPull() {
   if (save.cards < GACHA_COST) return null;
   save.cards -= GACHA_COST;
@@ -511,6 +511,7 @@ function importPvpCode(code) {
 }
 function renderGacha() {
   document.getElementById("gacha-card-count").textContent = `🎴 보유 카드: ${save.cards}개`;
+  document.getElementById("btn-gacha-pull").textContent = `뽑기 (카드 ${GACHA_COST}개)`;
   document.getElementById("btn-gacha-pull").disabled = save.cards < GACHA_COST;
   const gallery = document.getElementById("gacha-gallery");
   gallery.innerHTML = "";
@@ -645,11 +646,14 @@ function startStage(stageDef) {
     autoSpawn: false,
     bossWave: null,
     bossWaveTimer: 3000,
+    itemUsed: { speed: false, atk: false, gold: false },
+    itemTimer: { speed: 0, atk: 0, gold: 0 },
     over: false,
     lastTime: performance.now(),
   };
   ALLY_TYPES.forEach(t => { battle.cooldowns[t.id] = 0; });
   selectedUnit = null;
+  resetItemButtons();
   if (stageDef.finalBoss) {
     // 최종 보스전 시작과 함께 총을 든 사람 영웅을 얻고, 바로 조종할 수 있게 선택된다
     const hero = createHero();
@@ -692,11 +696,14 @@ function startPvpBattle(oppData) {
     autoSpawn: false,
     bossWave: null,
     bossWaveTimer: Infinity,
+    itemUsed: { speed: false, atk: false, gold: false },
+    itemTimer: { speed: 0, atk: 0, gold: 0 },
     over: false,
     lastTime: performance.now(),
   };
   ALLY_TYPES.forEach(t => { battle.cooldowns[t.id] = 0; battle.oppCooldowns[t.id] = 0; });
   selectedUnit = null;
+  resetItemButtons();
   document.getElementById("control-hint").textContent = "⚔️ 코드 대전 중!";
   const autoBtn = document.getElementById("btn-autospawn");
   autoBtn.classList.remove("on");
@@ -830,7 +837,8 @@ function dealDamageToUnit(target, dmg) {
 function onUnitDeath(unit) {
   if (unit.side === "enemy" && !unit.oppAlly) {
     const isGold = unit.catId === "gold";
-    const reward = Math.round((6 + unit.tier * 4) * (isGold ? 5 : 1));
+    const goldMul = battle.itemTimer.gold > 0 ? 2 : 1;
+    const reward = Math.round((6 + unit.tier * 4) * (isGold ? 5 : 1) * goldMul);
     battle.money += reward;
     spawnFlyReward(unit.x, unit.y - 30, `+${reward}💰`, "#b8860b");
     const dropChance = isGold ? 1 : 0.22;
@@ -875,7 +883,10 @@ function updateUnit(u, dt) {
   if (found) {
     if (found.dist <= u.range) {
       if (u.atkTimer <= 0) {
-        dealDamageToUnit(found.target, u.atk);
+        // "공격력 2배" 아이템은 아군(오프얼라이 상대팀 제외)에게만 적용된다
+        const atkMul = (u.side === "ally" && !u.oppAlly && battle.itemTimer.atk > 0) ? 2 : 1;
+        const dmg = Math.round(u.atk * atkMul);
+        dealDamageToUnit(found.target, dmg);
         if (u.aoe) {
           // 너구리처럼 광역 공격형 유닛은 주 타겟 옆의 다른 적에게도 약한 스플래시 피해를 준다
           let splash = null, splashDist = Infinity;
@@ -884,7 +895,7 @@ function updateUnit(u, dt) {
             const d = Math.abs(o.x - u.x);
             if (d <= u.range && d < splashDist) { splashDist = d; splash = o; }
           }
-          if (splash) dealDamageToUnit(splash, Math.round(u.atk * 0.4));
+          if (splash) dealDamageToUnit(splash, Math.round(dmg * 0.4));
         }
         u.atkTimer = u.atkInterval;
         u.attackAnim = 180;
@@ -1056,6 +1067,42 @@ document.getElementById("btn-autospawn").addEventListener("click", (e) => {
   e.currentTarget.classList.toggle("on", battle.autoSpawn);
   e.currentTarget.textContent = battle.autoSpawn ? "🔁 자동 소환 ON" : "🔁 자동 소환 OFF";
   playSfx("click");
+});
+
+const ITEM_DURATION = 12000; // 아이템 효과 지속시간(ms)
+function updateItemUI() {
+  const labels = { speed: "⚡ 2배속", atk: "💥 공격 2배", gold: "💰 골드 2배" };
+  ["speed", "atk", "gold"].forEach(kind => {
+    const btn = document.getElementById(`btn-item-${kind}`);
+    if (battle.itemTimer[kind] > 0) {
+      btn.textContent = `${labels[kind]} (${Math.ceil(battle.itemTimer[kind] / 1000)}s)`;
+    } else if (!battle.itemUsed[kind]) {
+      btn.textContent = labels[kind];
+    } else {
+      btn.textContent = `${labels[kind]} (사용함)`;
+    }
+  });
+}
+function resetItemButtons() {
+  ["speed", "atk", "gold"].forEach(kind => {
+    const btn = document.getElementById(`btn-item-${kind}`);
+    btn.disabled = false;
+    btn.classList.remove("active");
+  });
+}
+function useItem(kind) {
+  if (!battle || battle.over || battle.itemUsed[kind]) return;
+  battle.itemUsed[kind] = true;
+  battle.itemTimer[kind] = ITEM_DURATION;
+  const btn = document.getElementById(`btn-item-${kind}`);
+  btn.disabled = true;
+  btn.classList.add("active");
+  playSfx("evolve");
+  const labels = { speed: "⚡ 2배속 발동!", atk: "💥 공격력 2배 발동!", gold: "💰 골드 2배 발동!" };
+  spawnFloatText(CANVAS_W / 2, LANE_Y - 130, labels[kind], "#3f8ce0");
+}
+["speed", "atk", "gold"].forEach(kind => {
+  document.getElementById(`btn-item-${kind}`).addEventListener("click", () => useItem(kind));
 });
 
 function endStage(win) {
@@ -1376,11 +1423,18 @@ function updateUnitBarUI() {
 /* ===================== 메인 루프 ===================== */
 function gameLoop(now) {
   if (!battle) return;
-  const dt = Math.min(60, now - battle.lastTime);
+  const rawDt = Math.min(60, now - battle.lastTime);
   battle.lastTime = now;
+  let dt = rawDt;
 
   if (!battle.over) {
-    battle.money += battle.stage.moneyPerTick * (dt / 1000);
+    ["speed", "atk", "gold"].forEach(kind => {
+      if (battle.itemTimer[kind] > 0) battle.itemTimer[kind] = Math.max(0, battle.itemTimer[kind] - rawDt);
+    });
+    // "2배속" 아이템이 켜져 있으면 이후의 모든 갱신에 쓰이는 dt를 2배로 늘려 게임 진행 자체를 빠르게 한다
+    dt = battle.itemTimer.speed > 0 ? rawDt * 2 : rawDt;
+    const goldMul = battle.itemTimer.gold > 0 ? 2 : 1;
+    battle.money += battle.stage.moneyPerTick * goldMul * (dt / 1000);
     ALLY_TYPES.forEach(t => {
       if (battle.cooldowns[t.id] > 0) battle.cooldowns[t.id] = Math.max(0, battle.cooldowns[t.id] - dt);
     });
@@ -1419,6 +1473,7 @@ function gameLoop(now) {
     document.getElementById("player-hp-fill").style.width = `${(battle.playerBaseHp / battle.playerBaseMaxHp) * 100}%`;
     document.getElementById("money-label").textContent = `💰 ${Math.floor(battle.money)}`;
     updateUnitBarUI();
+    updateItemUI();
   }
 
   render();

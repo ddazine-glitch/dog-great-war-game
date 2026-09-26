@@ -271,6 +271,17 @@ button {
 }
 #control-ui button:active { transform: translateY(2px); box-shadow: none; }
 
+#item-ui {
+  display: flex; justify-content: center; gap: 8px; margin: 6px 0; flex-wrap: wrap;
+}
+.item-btn {
+  border: none; border-radius: 999px; padding: 8px 14px; font-weight: bold; cursor: pointer;
+  background: #ffe08a; box-shadow: 0 3px 0 #d9a12d;
+}
+.item-btn.active { background: #6fbf73; color: #fff; box-shadow: 0 3px 0 #3f8a45; }
+.item-btn:disabled { background: #ddd; color: #999; box-shadow: 0 3px 0 #b3b3b3; cursor: not-allowed; }
+.item-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+
 #cannon-ui {
   display: flex; align-items: center; gap: 10px;
   justify-content: center;
