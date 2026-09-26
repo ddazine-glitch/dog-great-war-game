@@ -1245,7 +1245,7 @@ function updateProjectiles(dt) {
     if (p.trail.length > 5) p.trail.shift();
     const step = CANNON_FLIGHT_SPEED * (dt / 1000);
     const newX = p.x - step;
-    // 파도는 적을 통과하면서 그 자리에 있던 모든 적에게 데미지를 주고 계속 나간다 (한 명에서 멈추지 않음)
+    // 파도는 한 명에서 멈추지 않고, 지나가는 자리에 있던 모든 적을 관통하며 데미지를 준다
     for (const u of battle.units) {
       if (u.dead || u.side !== "enemy" || p.hitIds.has(u)) continue;
       if (u.x <= p.x && u.x >= newX) {
@@ -1258,9 +1258,12 @@ function updateProjectiles(dt) {
     p.x = newX;
     if (p.x <= LEFT_BASE_X) {
       p.hit = true;
-      attackBase("ally", p.dmg);
-      spawnBurst(LEFT_BASE_X, LANE_Y - 6, "#5ec8e8");
-      spawnFloatText(LEFT_BASE_X, LANE_Y - 90, `기지 명중 -${p.dmg}`, "#e04545");
+      // 적을 한 명이라도 맞혔으면 기지는 안 맞고, 지나가는 길에 적이 하나도 없었을 때만 기지를 직격한다
+      if (p.hitIds.size === 0) {
+        attackBase("ally", p.dmg);
+        spawnBurst(LEFT_BASE_X, LANE_Y - 6, "#5ec8e8");
+        spawnFloatText(LEFT_BASE_X, LANE_Y - 90, `기지 명중 -${p.dmg}`, "#e04545");
+      }
     }
   }
   battle.projectiles = battle.projectiles.filter(p => !p.hit);
@@ -1350,7 +1353,6 @@ document.getElementById("btn-cannon").addEventListener("click", () => {
   if (!battle || battle.over) return;
   fireCannon(); // 쿨타임 없이 누르는 즉시 발사
 });
-
 const ITEM_DURATION = 12000; // 아이템 효과 지속시간(ms)
 function updateItemUI() {
   const labels = { speed: "⚡ 2배속", atk: "💥 공격 2배", gold: "💰 골드 2배" };
