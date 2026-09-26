@@ -1236,7 +1236,7 @@ function attackBase(attackerSide, dmg) {
 
 const CANNON_FLIGHT_SPEED = 1500; // px/sec, 포탄이 화면을 가로지르는 속도
 
-const CANNON_COOLDOWN = 3000; // 대포 재발사 쿨타임(ms)
+const CANNON_COOLDOWN = 5000; // 대포 재발사 쿨타임(ms)
 function fireCannon() {
   const dmg = Math.round((220 + battle.stage.globalIndex * 32) * CANNON_DMG_MUL[save.cannonLevel]);
   battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, dmg, hit: false, trail: [], level: save.cannonLevel, hitIds: new Set() });
