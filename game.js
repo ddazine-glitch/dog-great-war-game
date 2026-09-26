@@ -380,6 +380,8 @@ function defaultSave() {
     cannonLevel: 1,
     ownedAllies: ["dog"],
     cards: 0,
+    enemyOwnedAllies: [],
+    enemyAllyStages: {},
   };
 }
 const GACHA_COST = 1;
@@ -398,6 +400,11 @@ function getRarity(cost) {
   if (cost >= 50) return "rare";
   return "normal";
 }
+// 등급이 높을수록 데미지도 확실히 더 세지도록 등급별 고정 배율을 곱한다
+const RARITY_DMG_MUL = { normal: 1, rare: 1.3, super: 1.7, ultra: 2.2, legend: 3.0 };
+function getRarityDmgMul(cost) {
+  return RARITY_DMG_MUL[getRarity(cost)];
+}
 function weightedPickLocked(locked) {
   const byRarity = {};
   locked.forEach(t => { const r = getRarity(t.cost); (byRarity[r] = byRarity[r] || []).push(t); });
@@ -413,6 +420,18 @@ function weightedPickLocked(locked) {
   }
   return locked[locked.length - 1];
 }
+// 내가 새 캐릭터를 뽑을 때마다, 상대팀도 똑같이 한 마리를 뽑아서 상대팀 풀에도 좋은 애가 생긴다
+function enemyGachaPull() {
+  const locked = ALLY_TYPES.filter(t => !save.enemyOwnedAllies.includes(t.id));
+  const pool = locked.length > 0 ? locked : ALLY_TYPES;
+  const picked = weightedPickLocked(pool);
+  if (!save.enemyOwnedAllies.includes(picked.id)) save.enemyOwnedAllies.push(picked.id);
+  // 상대팀 캐릭터의 단계는 내 부대의 평균 진화 단계 근처로 맞춰서, "좋은 애"가 나오게 한다
+  const myStages = save.ownedAllies.map(id => (save.allies[id] || {}).stage || 1);
+  const avgStage = myStages.length ? Math.round(myStages.reduce((a, b) => a + b, 0) / myStages.length) : 1;
+  const variance = Math.floor(Math.random() * 3) - 1; // -1~+1
+  save.enemyAllyStages[picked.id] = Math.min(STAGE_MAX, Math.max(1, avgStage + variance));
+}
 function gachaPull() {
   if (save.cards < GACHA_COST) return null;
   save.cards -= GACHA_COST;
@@ -422,6 +441,7 @@ function gachaPull() {
     const picked = weightedPickLocked(locked);
     save.ownedAllies.push(picked.id);
     result = { type: picked };
+    enemyGachaPull();
   } else {
     const f = FRUITS[Math.floor(Math.random() * FRUITS.length)];
     save.fruits[f.id] += 5;
@@ -472,7 +492,7 @@ function getAllyStats(typeId) {
   const base = ALLY_TYPES.find(t => t.id === typeId);
   const prog = save.allies[typeId];
   const maxHp = Math.round(base.hp * STAGE_HP_MUL[prog.stage] + prog.bonus.hp);
-  const atk = Math.round(base.atk * STAGE_ATK_MUL[prog.stage] + prog.bonus.atk);
+  const atk = Math.round(base.atk * STAGE_ATK_MUL[prog.stage] * getRarityDmgMul(base.cost) + prog.bonus.atk);
   const atkInterval = Math.max(250, base.atkInterval * (1 - prog.bonus.atkSpeed));
   const speed = base.speed * (1 + prog.bonus.speed);
   const range = base.range + prog.bonus.range;
@@ -828,7 +848,7 @@ function computePlayerAvgAtk() {
     const base = ALLY_TYPES.find(t => t.id === id);
     if (!base) return sum;
     const stage = (save.allies[id] || {}).stage || 1;
-    return sum + base.atk * (STAGE_ATK_MUL[stage] || 1);
+    return sum + base.atk * (STAGE_ATK_MUL[stage] || 1) * getRarityDmgMul(base.cost);
   }, 0);
   return total / save.ownedAllies.length;
 }
@@ -853,6 +873,27 @@ function createEnemy(catId, mul) {
   u.range = def.range;
   u.speed = def.speed;
   u.atkInterval = def.atkInterval;
+  return u;
+}
+// 상대팀도 나처럼 뽑은 캐릭터 풀이 있으면, 그 중 하나를 골라 적으로 내보낸다 (일반전에서도 좋은 상대가 나올 수 있게)
+function createEnemyAllyUnit() {
+  const pool = save.enemyOwnedAllies;
+  if (!pool || !pool.length) return null;
+  const id = pool[Math.floor(Math.random() * pool.length)];
+  const base = ALLY_TYPES.find(t => t.id === id);
+  if (!base) return null;
+  const stage = save.enemyAllyStages[id] || 1;
+  const u = new Unit("enemy", ENEMY_SPAWN_X);
+  u.typeId = id;
+  u.oppAlly = true;
+  u.stage = stage;
+  u.maxHp = Math.round(base.hp * (STAGE_HP_MUL[stage] || 1));
+  u.hp = u.maxHp;
+  const dynAtkMul = (battle && battle.dynamicCatAtkMul) || 1;
+  u.atk = Math.round(base.atk * (STAGE_ATK_MUL[stage] || 1) * getRarityDmgMul(base.cost) * dynAtkMul);
+  u.range = base.range;
+  u.speed = base.speed;
+  u.atkInterval = base.atkInterval;
   return u;
 }
 
@@ -958,7 +999,7 @@ function opponentAutoSpawnTick() {
     u.stage = stage;
     u.maxHp = Math.round(base.hp * (STAGE_HP_MUL[stage] || 1));
     u.hp = u.maxHp;
-    u.atk = Math.round(base.atk * (STAGE_ATK_MUL[stage] || 1));
+    u.atk = Math.round(base.atk * (STAGE_ATK_MUL[stage] || 1) * getRarityDmgMul(base.cost));
     u.range = base.range;
     u.speed = base.speed;
     u.atkInterval = base.atkInterval;
@@ -1693,8 +1734,14 @@ function gameLoop(now) {
       if (battle.spawnTimer <= 0) {
         const enemyCount = battle.units.reduce((n, u) => n + (u.side === "enemy" && !u.dead ? 1 : 0), 0);
         if (enemyCount < MAX_ENEMIES_ON_FIELD) {
-          const catId = pickCatId(battle.stage);
-          battle.units.push(createEnemy(catId, battle.stage.catStatMul));
+          // 상대팀도 뽑은 캐릭터가 있으면 가끔 고양이 대신 그 캐릭터가 나온다
+          const enemyAllyUnit = (Math.random() < 0.25) ? createEnemyAllyUnit() : null;
+          if (enemyAllyUnit) {
+            battle.units.push(enemyAllyUnit);
+          } else {
+            const catId = pickCatId(battle.stage);
+            battle.units.push(createEnemy(catId, battle.stage.catStatMul));
+          }
           spawnImpact(ENEMY_SPAWN_X, LANE_Y - 10, "#ff8a8a");
           playSfx("spawnEnemy");
           battle.spawnTimer = battle.stage.spawnInterval;
