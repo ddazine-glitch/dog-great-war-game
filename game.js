@@ -290,7 +290,6 @@ const NEW_CREATURES = [
     EVOLUTION_FORMS[c.id] = makeEvolutionForms(c.emoji, c.evolved, ACC_PALETTE[i % ACC_PALETTE.length]);
   });
 })();
-
 const FRUITS = [
   { id: "red",    name: "빨강 열매", emoji: "🍎", flavor: "공격력" },
   { id: "orange", name: "주황 열매", emoji: "🍊", flavor: "체력" },
@@ -383,9 +382,11 @@ function defaultSave() {
     cards: 0,
     enemyOwnedAllies: [],
     enemyAllyStages: {},
+    pullsSinceEnemyGacha: 0,
   };
 }
 const GACHA_COST = 1;
+const PULLS_PER_ENEMY_GACHA = 3; // 내가 3번 뽑아야 상대팀도 한 번 뽑는다
 // 세질수록(비쌀수록) 등급이 높고, 등급이 높을수록 뽑힐 확률은 낮다
 const RARITY_INFO = {
   normal: { label: "일반",       weight: 45, color: "#999" },
@@ -442,7 +443,12 @@ function gachaPull() {
     const picked = weightedPickLocked(locked);
     save.ownedAllies.push(picked.id);
     result = { type: picked };
-    enemyGachaPull();
+    // 내가 3번 뽑을 때마다 상대팀도 한 번 뽑는다
+    save.pullsSinceEnemyGacha = (save.pullsSinceEnemyGacha || 0) + 1;
+    if (save.pullsSinceEnemyGacha >= PULLS_PER_ENEMY_GACHA) {
+      enemyGachaPull();
+      save.pullsSinceEnemyGacha = 0;
+    }
   } else {
     const f = FRUITS[Math.floor(Math.random() * FRUITS.length)];
     save.fruits[f.id] += 5;
