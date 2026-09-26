@@ -38,6 +38,11 @@ const ALLY_TYPES = [
   { id: "elephant", name: "코끼리", emoji: "🐘", cost: 130, cooldown: 5200, hp: 260, atk: 30, range: 46, atkInterval: 1400, speed: 20 },
 ];
 
+// 최종 보스전에서만 등장하는 특별 영웅 - 돈으로 못 뽑고, 보스전 시작할 때 자동으로 주어지고 선택된다
+const HERO_UNIT = { id: "hero", name: "사람 영웅", emoji: "🧍", badge: "🔫", hp: 320, atk: 24, range: 60, atkInterval: 500, speed: 40 };
+const BOSS_WAVE_SPEED = 480; // px/sec, 최종 보스의 파동 공격이 휩쓸고 가는 속도
+const BOSS_WAVE_DAMAGE_RATIO = 0.3; // 조종중인 캐릭터 최대체력의 30%
+
 // 진화 단계별로 색만 바뀌는 게 아니라 실루엣 자체가 달라지도록 캐릭터/장식 조합을 따로 정의한다
 const EVOLUTION_FORMS = {
   hippo: [
@@ -537,6 +542,21 @@ function createAlly(typeId) {
   return u;
 }
 
+function createHero() {
+  const u = new Unit("ally", ALLY_SPAWN_X);
+  u.typeId = "hero";
+  u.emoji = HERO_UNIT.emoji;
+  u.badge = HERO_UNIT.badge;
+  u.name = HERO_UNIT.name;
+  u.maxHp = HERO_UNIT.hp;
+  u.hp = HERO_UNIT.hp;
+  u.atk = HERO_UNIT.atk;
+  u.range = HERO_UNIT.range;
+  u.speed = HERO_UNIT.speed;
+  u.atkInterval = HERO_UNIT.atkInterval;
+  return u;
+}
+
 function createEnemy(catId, mul) {
   const def = CAT_DEFS[catId];
   const u = new Unit("enemy", ENEMY_SPAWN_X);
@@ -571,12 +591,23 @@ function startStage(stageDef) {
     cannonCharge: 0,
     cannonMax: 5000 * CANNON_CHARGE_MUL[save.cannonLevel],
     autoSpawn: false,
+    bossWave: null,
+    bossWaveTimer: 3000,
     over: false,
     lastTime: performance.now(),
   };
   ALLY_TYPES.forEach(t => { battle.cooldowns[t.id] = 0; });
   selectedUnit = null;
-  document.getElementById("control-hint").textContent = "🐾 아군 캐릭터를 탭해서 골라보세요";
+  if (stageDef.finalBoss) {
+    // 최종 보스전 시작과 함께 총을 든 사람 영웅을 얻고, 바로 조종할 수 있게 선택된다
+    const hero = createHero();
+    battle.units.push(hero);
+    selectedUnit = hero;
+    hero.selected = true;
+    document.getElementById("control-hint").textContent = "🔫 사람 영웅 등장! 보스의 파동을 이동/점프로 피하세요";
+  } else {
+    document.getElementById("control-hint").textContent = "🐾 아군 캐릭터를 탭해서 골라보세요";
+  }
   const autoBtn = document.getElementById("btn-autospawn");
   autoBtn.classList.remove("on");
   autoBtn.textContent = "🔁 자동 소환 OFF";
@@ -693,7 +724,7 @@ function onUnitDeath(unit) {
 
 function updateUnit(u, dt) {
   if (u.dead) return;
-  if (u.side === "ally") {
+  if (u.side === "ally" && u.typeId !== "hero") {
     const stats = getAllyStats(u.typeId);
     if (stats.maxHp !== u.maxHp) {
       u.hp += (stats.maxHp - u.maxHp);
@@ -849,6 +880,44 @@ function drawProjectiles() {
     ctx.fillText(look.emoji, 0, 0);
     ctx.restore();
   }
+}
+
+function updateBossWave(dt) {
+  if (!battle.stage.finalBoss) return;
+  if (!battle.bossWave) {
+    battle.bossWaveTimer -= dt;
+    if (battle.bossWaveTimer <= 0) {
+      battle.bossWave = { x: LEFT_BASE_X, resolved: false };
+      battle.bossWaveTimer = 4500 + Math.random() * 2000;
+      spawnFloatText(CANVAS_W / 2, LANE_Y - 130, "⚠️ 보스 파동 공격! 점프로 피하세요", "#e04545");
+      playSfx("baseHit");
+    }
+    return;
+  }
+  const w = battle.bossWave;
+  w.x += BOSS_WAVE_SPEED * (dt / 1000);
+  if (!w.resolved && selectedUnit && !selectedUnit.dead && selectedUnit.side === "ally") {
+    if (Math.abs(selectedUnit.x - w.x) < 22) {
+      w.resolved = true;
+      if (selectedUnit.manualJumpT > 0) {
+        spawnFloatText(selectedUnit.x, selectedUnit.y - 70, "회피 성공!", "#3f8ce0");
+        playSfx("feed");
+      } else {
+        const dmg = Math.round(selectedUnit.maxHp * BOSS_WAVE_DAMAGE_RATIO);
+        dealDamageToUnit(selectedUnit, dmg);
+      }
+    }
+  }
+  if (w.x > RIGHT_BASE_X + 40) battle.bossWave = null;
+}
+function drawBossWave() {
+  if (!battle.bossWave) return;
+  ctx.save();
+  ctx.translate(battle.bossWave.x, LANE_Y - 20);
+  ctx.font = "60px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("💢", 0, 0);
+  ctx.restore();
 }
 document.getElementById("btn-autospawn").addEventListener("click", (e) => {
   if (!battle || battle.over) return;
@@ -1029,7 +1098,7 @@ function drawUnit(u) {
 
   ctx.font = "30px sans-serif";
   ctx.textAlign = "center";
-  if (u.side === "ally") {
+  if (u.side === "ally" && EVOLUTION_FORMS[u.typeId]) {
     const form = EVOLUTION_FORMS[u.typeId][(u.stage || 1) - 1];
     ctx.fillText(form.emoji, 0, 0);
     for (const acc of form.accessories) {
@@ -1132,6 +1201,7 @@ function render() {
   drawBase(RIGHT_BASE_X, "ally", battle.playerBaseHp, battle.playerBaseMaxHp);
   for (const u of battle.units) if (!u.dead) drawUnit(u);
   drawProjectiles();
+  drawBossWave();
 }
 
 /* ===================== 유닛 바 UI 갱신 ===================== */
@@ -1183,6 +1253,7 @@ function gameLoop(now) {
     updateCannon(dt);
     updateProjectiles(dt);
     if (battle.autoSpawn) autoSpawnTick();
+    updateBossWave(dt);
 
     document.getElementById("enemy-hp-fill").style.width = `${(battle.enemyBaseHp / battle.enemyBaseMaxHp) * 100}%`;
     document.getElementById("player-hp-fill").style.width = `${(battle.playerBaseHp / battle.playerBaseMaxHp) * 100}%`;
