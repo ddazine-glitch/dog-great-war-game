@@ -29,14 +29,15 @@ function getAllyTraitInfo(typeId) {
 }
 
 const STAGE_MAX = 6;
-const STAGE_HP_MUL = { 1: 1, 2: 1.5, 3: 2.1, 4: 2.8, 5: 3.6, 6: 4.6 };
-const STAGE_ATK_MUL = { 1: 1, 2: 1.4, 3: 1.9, 4: 2.5, 5: 3.2, 6: 4.0 };
-// 다음 단계로 올라가는 데 필요한 "누적" 열매 급여 횟수 (단계별)
-const STAGE_UP_THRESHOLDS = { 2: 3, 3: 7, 4: 12, 5: 18, 6: 25 };
+// 진화해도 "많이" 강해지지 않고 "조금"만 강해지도록 성장폭을 줄임
+const STAGE_HP_MUL = { 1: 1, 2: 1.25, 3: 1.55, 4: 1.85, 5: 2.15, 6: 2.5 };
+const STAGE_ATK_MUL = { 1: 1, 2: 1.2, 3: 1.45, 4: 1.7, 5: 1.95, 6: 2.2 };
+// 다음 단계로 올라가는 데 필요한 "누적" 열매 급여 횟수 (단계별) - 진화를 더 어렵게
+const STAGE_UP_THRESHOLDS = { 2: 5, 3: 11, 4: 19, 5: 29, 6: 40 };
 
 // 기지/대포도 캐릭터처럼 열매로 3단계까지 강화 - 단계마다 모습도 함께 바뀐다
 const UPGRADE_MAX = 3;
-const UPGRADE_COST = { 2: 10, 3: 25 }; // 다음 단계까지 필요한 누적 열매 수
+const UPGRADE_COST = { 2: 5, 3: 5 }; // 단계당 열매 5개면 강화 가능
 const BASE_HP_MUL = { 1: 1, 2: 1.6, 3: 2.4 };
 const CANNON_DMG_MUL = { 1: 0.4, 2: 0.7, 3: 1.0 };
 const CANNON_CHARGE_MUL = { 1: 1, 2: 0.85, 3: 0.7 };
@@ -340,7 +341,7 @@ const STAGES = (() => {
         spawnInterval: Math.max(600, 2600 - gi * 3.2) * (isMiniBoss ? 0.7 : 1),
         catStatMul: (1 + (gi - 1) * 0.022) * (isMiniBoss ? 1.4 : 1),
         moneyPerTick: 5 + gi * 0.05,
-        fruitReward: 2 + Math.floor(gi / 40) + (isMiniBoss ? 3 : 0),
+        fruitReward: 1 + Math.floor(gi / 60) + (isMiniBoss ? 2 : 0),
         isBoss: false,
       });
     }
@@ -351,7 +352,7 @@ const STAGES = (() => {
       tierPool: pool, includeBoss: true, worldBoss: true,
       enemyBaseMaxHp: (260 + gi * 60) * 3, spawnInterval: Math.max(600, 2600 - gi * 3.2) * 0.6,
       catStatMul: (1 + (gi - 1) * 0.022) * 1.8,
-      moneyPerTick: (5 + gi * 0.05) * 1.5, fruitReward: 20 + world * 15,
+      moneyPerTick: (5 + gi * 0.05) * 1.5, fruitReward: 10 + world * 6,
       isBoss: true,
     });
   }
@@ -361,7 +362,7 @@ const STAGES = (() => {
     id: "final-boss", label: "최종 보스전", world: WORLD_COUNT + 1, chapter: WORLD_COUNT + 1, stageNum: "final", globalIndex: gi,
     tierPool: [1, 2, 3], includeBoss: true, finalBoss: true,
     enemyBaseMaxHp: 12000, spawnInterval: 450, catStatMul: 11,
-    moneyPerTick: 20, fruitReward: 100,
+    moneyPerTick: 20, fruitReward: 50,
     isBoss: true,
   });
   return list;
@@ -1067,11 +1068,11 @@ function dealDamageToUnit(target, dmg) {
 function onUnitDeath(unit) {
   if (unit.side === "enemy" && !unit.oppAlly) {
     const isGold = unit.catId === "gold";
-    const goldMul = battle.itemTimer.gold > 0 ? 2 : 1;
+    const goldMul = battle.itemTimer.gold > 0 ? 1.5 : 1;
     const reward = Math.round((6 + unit.tier * 4) * (isGold ? 5 : 1) * goldMul);
     battle.money += reward;
     spawnFlyReward(unit.x, unit.y - 30, `+${reward}💰`, "#b8860b");
-    const dropChance = isGold ? 1 : 0.22;
+    const dropChance = isGold ? 1 : 0.13;
     if (Math.random() < dropChance) {
       const f = FRUITS[Math.floor(Math.random() * FRUITS.length)];
       save.fruits[f.id]++;
@@ -1114,7 +1115,7 @@ function updateUnit(u, dt) {
     if (found.dist <= u.range) {
       if (u.atkTimer <= 0) {
         // "공격력 2배" 아이템은 아군(오프얼라이 상대팀 제외)에게만 적용된다
-        const atkMul = (u.side === "ally" && !u.oppAlly && battle.itemTimer.atk > 0) ? 2 : 1;
+        const atkMul = (u.side === "ally" && !u.oppAlly && battle.itemTimer.atk > 0) ? 1.5 : 1;
         // 6단계까지 강화하면 특성이 붙어서 특정 속성 상대에게는 강하고, 다른 속성 상대에게는 약해진다
         let traitMul = 1;
         if (u.side === "ally" && !u.oppAlly && u.stage >= TRAIT_UNLOCK_STAGE && found.target.trait) {
@@ -1340,7 +1341,7 @@ function useItem(kind) {
   btn.disabled = true;
   btn.classList.add("active");
   playSfx("evolve");
-  const labels = { speed: "⚡ 2배속 발동!", atk: "💥 공격력 2배 발동!", gold: "💰 골드 2배 발동!" };
+  const labels = { speed: "⚡ 1.5배속 발동!", atk: "💥 공격력 1.5배 발동!", gold: "💰 골드 1.5배 발동!" };
   spawnFloatText(CANVAS_W / 2, LANE_Y - 130, labels[kind], "#3f8ce0");
 }
 ["speed", "atk", "gold"].forEach(kind => {
@@ -1673,9 +1674,9 @@ function gameLoop(now) {
     ["speed", "atk", "gold"].forEach(kind => {
       if (battle.itemTimer[kind] > 0) battle.itemTimer[kind] = Math.max(0, battle.itemTimer[kind] - rawDt);
     });
-    // "2배속" 아이템이 켜져 있으면 이후의 모든 갱신에 쓰이는 dt를 2배로 늘려 게임 진행 자체를 빠르게 한다
-    dt = battle.itemTimer.speed > 0 ? rawDt * 2 : rawDt;
-    const goldMul = battle.itemTimer.gold > 0 ? 2 : 1;
+    // "1.5배속" 아이템이 켜져 있으면 이후의 모든 갱신에 쓰이는 dt를 1.5배로 늘려 게임 진행 자체를 빠르게 한다
+    dt = battle.itemTimer.speed > 0 ? rawDt * 1.5 : rawDt;
+    const goldMul = battle.itemTimer.gold > 0 ? 1.5 : 1;
     battle.money += battle.stage.moneyPerTick * goldMul * (dt / 1000);
     ALLY_TYPES.forEach(t => {
       if (battle.cooldowns[t.id] > 0) battle.cooldowns[t.id] = Math.max(0, battle.cooldowns[t.id] - dt);
