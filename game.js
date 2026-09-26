@@ -231,7 +231,27 @@ function defaultSave() {
     allies,
     baseLevel: 1,
     cannonLevel: 1,
+    ownedAllies: ["dog"],
+    cards: 0,
   };
+}
+const GACHA_COST = 15;
+function gachaPull() {
+  if (save.cards < GACHA_COST) return null;
+  save.cards -= GACHA_COST;
+  const locked = ALLY_TYPES.filter(t => !save.ownedAllies.includes(t.id));
+  let result;
+  if (locked.length > 0) {
+    const picked = locked[Math.floor(Math.random() * locked.length)];
+    save.ownedAllies.push(picked.id);
+    result = { type: picked };
+  } else {
+    const f = FRUITS[Math.floor(Math.random() * FRUITS.length)];
+    save.fruits[f.id] += 5;
+    result = { consolationFruit: f };
+  }
+  persistSave();
+  return result;
 }
 function totalFruits() {
   return Object.values(save.fruits).reduce((a, b) => a + b, 0);
@@ -471,12 +491,26 @@ function renderBaseCannonUpgrades() {
   });
 }
 
+function renderGacha() {
+  document.getElementById("gacha-card-count").textContent = `🎴 보유 카드: ${save.cards}개`;
+  document.getElementById("btn-gacha-pull").disabled = save.cards < GACHA_COST;
+  const gallery = document.getElementById("gacha-gallery");
+  gallery.innerHTML = "";
+  ALLY_TYPES.forEach(type => {
+    const owned = save.ownedAllies.includes(type.id);
+    const slot = document.createElement("div");
+    slot.className = "gacha-slot" + (owned ? "" : " locked");
+    slot.innerHTML = `${owned ? type.emoji : "❓"}<span class="g-name">${owned ? type.name : "???"}</span>`;
+    gallery.appendChild(slot);
+  });
+}
+
 function renderRoster() {
   renderFruitBar();
   renderBaseCannonUpgrades();
   const list = document.getElementById("roster-list");
   list.innerHTML = "";
-  ALLY_TYPES.forEach(type => {
+  ALLY_TYPES.filter(type => save.ownedAllies.includes(type.id)).forEach(type => {
     const prog = save.allies[type.id];
     const card = document.createElement("div");
     card.className = "roster-card";
@@ -628,7 +662,7 @@ function pickCatId(stageDef) {
 function renderUnitBar() {
   const bar = document.getElementById("unit-bar");
   bar.innerHTML = "";
-  ALLY_TYPES.forEach(type => {
+  ALLY_TYPES.filter(type => save.ownedAllies.includes(type.id)).forEach(type => {
     const btn = document.createElement("button");
     btn.className = "unit-btn";
     btn.dataset.typeId = type.id;
@@ -645,6 +679,7 @@ function renderUnitBar() {
 
 function trySpawnAlly(typeId) {
   if (!battle || battle.over) return;
+  if (!save.ownedAllies.includes(typeId)) return;
   const stats = getAllyStats(typeId);
   if (battle.money < stats.base.cost) {
     playSfx("noMoney");
@@ -662,6 +697,7 @@ function trySpawnAlly(typeId) {
 function autoSpawnTick() {
   // 자동 소환 ON일 때, 쿨다운이 끝나고 돈이 충분한 유닛을 자동으로 계속 출격시킨다
   for (const type of ALLY_TYPES) {
+    if (!save.ownedAllies.includes(type.id)) continue;
     const stats = getAllyStats(type.id);
     if (battle.cooldowns[type.id] <= 0 && battle.money >= stats.base.cost) {
       trySpawnAlly(type.id);
@@ -941,15 +977,17 @@ function endStage(win) {
       save.fruits[f.id]++;
       gained.push(f.emoji);
     }
+    const cardsGained = battle.stage.finalBoss ? 50 : battle.stage.worldBoss ? 15 : (1 + Math.floor(battle.stage.globalIndex / 60));
+    save.cards += cardsGained;
     persistSave();
     let title = "승리!";
-    let desc = `보상 열매: ${gained.join(" ")}`;
+    let desc = `보상 열매: ${gained.join(" ")} / 🎴 카드 +${cardsGained}`;
     if (battle.stage.finalBoss) {
       title = "🎉 게임 클리어! 🎉";
       desc = "모든 세계와 최종 보스를 클리어했습니다! 최고의 강아지 부대예요.";
     } else if (battle.stage.worldBoss) {
       title = `👑 ${battle.stage.world}세계 클리어!`;
-      desc = `다음 세계로 나아가세요! 보상 열매: ${gained.join(" ")}`;
+      desc = `다음 세계로 나아가세요! 보상 열매: ${gained.join(" ")} / 🎴 카드 +${cardsGained}`;
     }
     document.getElementById("result-title").textContent = title;
     document.getElementById("result-desc").textContent = desc;
@@ -1284,6 +1322,33 @@ document.getElementById("btn-roster-back").addEventListener("click", () => {
   playSfx("click");
   renderStageGrid();
   showScreen("screen-stageselect");
+});
+document.getElementById("btn-open-gacha").addEventListener("click", () => {
+  playSfx("click");
+  renderGacha();
+  showScreen("screen-gacha");
+});
+document.getElementById("btn-gacha-back").addEventListener("click", () => {
+  playSfx("click");
+  renderStageGrid();
+  showScreen("screen-stageselect");
+});
+document.getElementById("btn-gacha-pull").addEventListener("click", () => {
+  const result = gachaPull();
+  const box = document.getElementById("gacha-result");
+  if (!result) {
+    playSfx("noMoney");
+    box.textContent = "🎴 카드가 부족해요!";
+  } else if (result.type) {
+    playSfx("evolve");
+    box.textContent = `🎉 ${result.type.emoji} ${result.type.name} 획득!`;
+  } else {
+    playSfx("feed");
+    box.textContent = `이미 모든 캐릭터를 보유 중! 대신 ${result.consolationFruit.emoji} 열매 5개를 받았어요.`;
+  }
+  box.classList.remove("reveal");
+  requestAnimationFrame(() => box.classList.add("reveal"));
+  renderGacha();
 });
 document.getElementById("btn-back-title").addEventListener("click", () => {
   playSfx("click");

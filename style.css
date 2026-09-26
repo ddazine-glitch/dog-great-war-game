@@ -134,6 +134,25 @@ button {
 .world-boss-btn.cleared { background: #ffe08a; box-shadow: 0 3px 0 #d9a12d; }
 .world-boss-btn:disabled { background: #ddd; color: #999; box-shadow: 0 3px 0 #b3b3b3; cursor: not-allowed; }
 
+/* ---------- Gacha ---------- */
+#screen-gacha { text-align: center; }
+#gacha-card-count { font-weight: bold; color: #b8860b; }
+#gacha-result { min-height: 60px; margin: 14px 0; font-size: 1.3em; font-weight: bold; }
+#gacha-result.reveal { animation: gachaPop .4s ease; }
+@keyframes gachaPop { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+.gacha-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+.gacha-slot {
+  background: #fff; border-radius: 12px; padding: 10px 4px;
+  box-shadow: 0 3px 0 #ddd; font-size: 1.6em;
+}
+.gacha-slot.locked { background: #eee; color: #bbb; filter: grayscale(1); }
+.gacha-slot .g-name { font-size: .5em; font-weight: bold; display: block; color: #555; }
+
 /* ---------- Roster ---------- */
 #screen-roster { text-align: center; }
 .fruit-bar {
