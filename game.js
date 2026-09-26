@@ -860,14 +860,9 @@ function updateCannon(dt) {
 const CANNON_FLIGHT_SPEED = 1500; // px/sec, 포탄이 화면을 가로지르는 속도
 
 function fireCannon(chargeRatio) {
-  let best = null, bestX = -Infinity;
-  for (const u of battle.units) {
-    if (u.dead || u.side !== "enemy") continue;
-    if (u.x > bestX) { bestX = u.x; best = u; }
-  }
   const dmg = Math.round((420 + battle.stage.globalIndex * 60) * chargeRatio * CANNON_DMG_MUL[save.cannonLevel]);
   // 포탄 대신 큰 파도가 기지에서 밀려나가 사정거리(내 기지~적 기지) 끝까지 휩쓸고 간다
-  battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, target: best, dmg, hit: false, trail: [], level: save.cannonLevel });
+  battle.projectiles.push({ x: RIGHT_BASE_X - 46, y: LANE_Y - 6, dmg, hit: false, trail: [], level: save.cannonLevel });
   spawnBurst(RIGHT_BASE_X - 30, LANE_Y - 6, "#5ec8e8");
   playSfx("cannon");
   battle.cannonCharge = 0;
@@ -876,15 +871,22 @@ function updateProjectiles(dt) {
   for (const p of battle.projectiles) {
     p.trail.push(p.x);
     if (p.trail.length > 5) p.trail.shift();
-    const targetX = (p.target && !p.target.dead) ? p.target.x : LEFT_BASE_X;
+    // 매 프레임 파도 앞(왼쪽)에 아직 남아있는 가장 가까운 적을 다시 찾는다
+    // (죽은 적을 그대로 통과해서 기지까지 뚫고 가버리는 것을 막기 위함)
+    let target = null, bestX = -Infinity;
+    for (const u of battle.units) {
+      if (u.dead || u.side !== "enemy") continue;
+      if (u.x <= p.x + 1 && u.x > bestX) { bestX = u.x; target = u; }
+    }
+    const targetX = target ? target.x : LEFT_BASE_X;
     const step = CANNON_FLIGHT_SPEED * (dt / 1000);
     if (p.x - targetX <= step) {
       p.x = targetX;
       p.hit = true;
-      if (p.target && !p.target.dead) {
-        dealDamageToUnit(p.target, p.dmg);
-        p.target.x = Math.max(ENEMY_SPAWN_X, p.target.x - 30); // 넉백: 적 기지 쪽으로 밀려남
-        spawnBurst(p.target.x, p.target.y - 20, "#5ec8e8");
+      if (target) {
+        dealDamageToUnit(target, p.dmg);
+        target.x = Math.max(ENEMY_SPAWN_X, target.x - 30); // 넉백: 적 기지 쪽으로 밀려남
+        spawnBurst(target.x, target.y - 20, "#5ec8e8");
       } else {
         attackBase("ally", p.dmg);
         spawnBurst(LEFT_BASE_X, LANE_Y - 6, "#5ec8e8");
