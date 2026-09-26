@@ -168,12 +168,16 @@ const CAT_DEFS = {
   wing:   { name: "날개 고양이", emoji: "🐱", badge: "🦋", tier: 3, hp: 150, atk: 18, speed: 26, range: 34, atkInterval: 900 },
   energy: { name: "에너지 고양이", emoji: "🐱", badge: "⚡", tier: 3, hp: 160, atk: 20, speed: 24, range: 36, atkInterval: 850 },
   boss:   { name: "보스 고양이", emoji: "🐯", badge: "👑", tier: 4, hp: 2200, atk: 34, speed: 14, range: 44, atkInterval: 850 },
+  ninja:  { name: "닌자 고양이", emoji: "🐱", badge: "🥷", tier: 2, hp: 85,  atk: 15, speed: 30, range: 30, atkInterval: 800 },
+  ice:    { name: "얼음 고양이", emoji: "🐱", badge: "❄️", tier: 3, hp: 170, atk: 16, speed: 20, range: 36, atkInterval: 900 },
+  gold:   { name: "황금 고양이", emoji: "🐱", badge: "💰", tier: 0, hp: 55, atk: 4, speed: 26, range: 28, atkInterval: 1200, special: "gold" },
 };
 const TIER_POOL = {
   1: ["white", "gray", "black"],
-  2: ["armor", "horn"],
-  3: ["wing", "energy"],
+  2: ["armor", "horn", "ninja"],
+  3: ["wing", "energy", "ice"],
 };
+const GOLD_CAT_CHANCE = 0.04; // 어느 세계에서든 낮은 확률로 등장하는 보상용 "좋은" 고양이
 
 const STAGES_PER_WORLD = 300;
 const WORLD_COUNT = 3;
@@ -655,6 +659,7 @@ function pickCatId(stageDef) {
   const pool = [];
   stageDef.tierPool.forEach(tier => pool.push(...TIER_POOL[tier]));
   if (stageDef.includeBoss && Math.random() < (stageDef.finalBoss ? 0.3 : stageDef.worldBoss ? 0.2 : 0.12)) return "boss";
+  if (Math.random() < GOLD_CAT_CHANCE) return "gold";
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -715,6 +720,10 @@ function spawnImpact(x, y, color) {
 function spawnFloatText(x, y, text, color) {
   battle.effects.push({ type: "text", x, y, life: 700, maxLife: 700, text, color: color || "#333" });
 }
+function spawnFlyReward(x, y, text, color) {
+  // 보상을 얻었을 때 위쪽 UI(돈/열매 표시) 방향으로 날아가는 것처럼 보이게 한다
+  battle.effects.push({ type: "flyReward", x, y, toX: CANVAS_W / 2, toY: 20, life: 800, maxLife: 800, text, color: color || "#333" });
+}
 function spawnHitSpark(x, y) {
   battle.effects.push({ type: "spark", x, y, life: 180, maxLife: 180 });
 }
@@ -746,14 +755,20 @@ function dealDamageToUnit(target, dmg) {
 
 function onUnitDeath(unit) {
   if (unit.side === "enemy") {
-    const reward = 6 + unit.tier * 4;
+    const isGold = unit.catId === "gold";
+    const reward = Math.round((6 + unit.tier * 4) * (isGold ? 5 : 1));
     battle.money += reward;
-    spawnFloatText(unit.x, unit.y - 30, `+${reward}💰`, "#b8860b");
-    if (Math.random() < 0.22) {
+    spawnFlyReward(unit.x, unit.y - 30, `+${reward}💰`, "#b8860b");
+    const dropChance = isGold ? 1 : 0.22;
+    if (Math.random() < dropChance) {
       const f = FRUITS[Math.floor(Math.random() * FRUITS.length)];
       save.fruits[f.id]++;
-      spawnFloatText(unit.x, unit.y - 50, f.emoji, "#333");
+      spawnFlyReward(unit.x, unit.y - 55, `${f.emoji} +1 획득!`, "#3f8ce0");
+      playSfx("feed");
       persistSave();
+    }
+    if (isGold) {
+      spawnFloatText(unit.x, unit.y - 82, "💰 황금 고양이!", "#e0a800");
     }
   }
 }
@@ -1222,6 +1237,15 @@ function drawEffects(dt) {
       ctx.fillStyle = e.color;
       ctx.textAlign = "center";
       ctx.fillText(e.text, e.x, e.y - t * 26);
+    } else if (e.type === "flyReward") {
+      const ease = 1 - Math.pow(1 - t, 2);
+      const px = e.x + (e.toX - e.x) * ease;
+      const py = e.y + (e.toY - e.y) * ease;
+      ctx.globalAlpha = t > 0.7 ? Math.max(0, (1 - t) / 0.3) : 1;
+      ctx.font = "bold 20px sans-serif";
+      ctx.fillStyle = e.color;
+      ctx.textAlign = "center";
+      ctx.fillText(e.text, px, py);
     }
     ctx.restore();
   }
